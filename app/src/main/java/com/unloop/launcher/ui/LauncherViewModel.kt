@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 enum class LauncherScreen {
+    ONBOARDING,
     HOME,
     ALL_APPS,
     SETTINGS,
@@ -34,7 +35,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val prefs = PreferencesManager.getInstance(application)
     private val repository = AppsRepository(application, prefs)
 
-    private val _currentScreen = MutableStateFlow(LauncherScreen.HOME)
+    private val _currentScreen = MutableStateFlow(determineInitialScreen())
     val currentScreen: StateFlow<LauncherScreen> = _currentScreen.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
@@ -191,8 +192,43 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         prefs.setThemeMode(mode)
     }
 
+    private fun determineInitialScreen(): LauncherScreen {
+        val isDefault = checkIfDefaultLauncher()
+        val isIntroDone = prefs.isIntroCompleted()
+        // If user hasn't seen the intro, or hasn't finished setting default launcher, show onboarding
+        return if (!isIntroDone || !isDefault) {
+            LauncherScreen.ONBOARDING
+        } else {
+            LauncherScreen.HOME
+        }
+    }
+
+    fun getInitialOnboardingPage(): Int {
+        // If user already passed the intro explanations (screens 1 & 2) but launcher setup is pending,
+        // take them directly to screen 3 (index 2) so they aren't forced to re-read the intro.
+        return if (prefs.isIntroCompleted() && !checkIfDefaultLauncher()) 2 else 0
+    }
+
+    fun markIntroCompleted() {
+        prefs.setIntroCompleted(true)
+    }
+
+    fun completeOnboarding() {
+        prefs.setIntroCompleted(true)
+        prefs.setOnboardingCompleted(true)
+        _currentScreen.value = LauncherScreen.HOME
+    }
+
     fun checkDefaultStatus() {
-        _isDefaultLauncher.value = checkIfDefaultLauncher()
+        val isDefault = checkIfDefaultLauncher()
+        _isDefaultLauncher.value = isDefault
+        if (isDefault) {
+            prefs.setOnboardingCompleted(true)
+            // If user was on onboarding and just completed default launcher setup, proceed to Home
+            if (_currentScreen.value == LauncherScreen.ONBOARDING) {
+                _currentScreen.value = LauncherScreen.HOME
+            }
+        }
     }
 
     private fun checkIfDefaultLauncher(): Boolean {

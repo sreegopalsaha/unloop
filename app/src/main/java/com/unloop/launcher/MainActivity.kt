@@ -22,6 +22,7 @@ import com.unloop.launcher.ui.screens.HiddenAppsScreen
 import com.unloop.launcher.ui.screens.HomeScreen
 import com.unloop.launcher.ui.screens.MindfulPromptDialog
 import com.unloop.launcher.ui.screens.NotificationsScreen
+import com.unloop.launcher.ui.screens.OnboardingScreen
 import com.unloop.launcher.ui.screens.SettingsScreen
 import com.unloop.launcher.ui.theme.UnloopTheme
 
@@ -79,6 +80,16 @@ fun LauncherRoot(
 
     Crossfade(targetState = currentScreen, label = "ScreenTransition") { screen ->
         when (screen) {
+            LauncherScreen.ONBOARDING -> {
+                OnboardingScreen(
+                    isDefaultLauncher = isDefaultLauncher,
+                    initialPage = viewModel.getInitialOnboardingPage(),
+                    onSetDefaultLauncher = { viewModel.openSetDefaultLauncher(activity) },
+                    onCompleteOnboarding = { viewModel.completeOnboarding() },
+                    onIntroCompleted = { viewModel.markIntroCompleted() }
+                )
+            }
+
             LauncherScreen.HOME -> {
                 HomeScreen(
                     favoriteApps = favoriteApps,

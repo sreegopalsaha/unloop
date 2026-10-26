@@ -165,6 +165,23 @@ class PreferencesManager(context: Context) {
         _themeModeFlow.value = mode
     }
 
+    // --- Onboarding & Intro Flow ---
+    fun isIntroCompleted(): Boolean {
+        return prefs.getBoolean(KEY_INTRO_COMPLETED, false)
+    }
+
+    fun setIntroCompleted(completed: Boolean) {
+        prefs.edit().putBoolean(KEY_INTRO_COMPLETED, completed).apply()
+    }
+
+    fun isOnboardingCompleted(): Boolean {
+        return prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
+    }
+
+    fun setOnboardingCompleted(completed: Boolean) {
+        prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, completed).apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "unloop_launcher_prefs"
         private const val KEY_FAVORITES = "pref_favorites"
@@ -177,6 +194,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_NOTIFICATION_APPS = "pref_notification_apps"
         private const val KEY_NOTIFICATIONS_JSON = "pref_notifications_json"
         private const val KEY_THEME_MODE = "pref_theme_mode"
+        private const val KEY_INTRO_COMPLETED = "pref_intro_completed"
+        private const val KEY_ONBOARDING_COMPLETED = "pref_onboarding_completed"
 
         @Volatile
         private var instance: PreferencesManager? = null
