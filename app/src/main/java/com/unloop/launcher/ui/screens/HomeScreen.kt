@@ -146,8 +146,10 @@ fun HomeScreen(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
                 ) {
                     items(favoriteApps, key = { it.packageName }) { app ->
                         Text(
