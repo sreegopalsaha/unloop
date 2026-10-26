@@ -1,0 +1,190 @@
+package com.unloop.launcher.data
+
+import android.content.Context
+import android.content.SharedPreferences
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+class PreferencesManager(context: Context) {
+
+    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private val _favoritesFlow = MutableStateFlow(getFavorites())
+    val favoritesFlow: StateFlow<Set<String>> = _favoritesFlow.asStateFlow()
+
+    private val _hiddenAppsFlow = MutableStateFlow(getHiddenApps())
+    val hiddenAppsFlow: StateFlow<Set<String>> = _hiddenAppsFlow.asStateFlow()
+
+    private val _shortVideoBlockerFlow = MutableStateFlow(isShortVideoBlockerEnabled())
+    val shortVideoBlockerFlow: StateFlow<Boolean> = _shortVideoBlockerFlow.asStateFlow()
+
+    private val _focusModeFlow = MutableStateFlow(isFocusModeEnabled())
+    val focusModeFlow: StateFlow<Boolean> = _focusModeFlow.asStateFlow()
+
+    private val _focusAppsFlow = MutableStateFlow(getFocusApps())
+    val focusAppsFlow: StateFlow<Set<String>> = _focusAppsFlow.asStateFlow()
+
+    private val _themeModeFlow = MutableStateFlow(getThemeMode())
+    val themeModeFlow: StateFlow<String> = _themeModeFlow.asStateFlow()
+
+    // --- Favorites ---
+    fun getFavorites(): Set<String> {
+        return prefs.getStringSet(KEY_FAVORITES, emptySet()) ?: emptySet()
+    }
+
+    fun setFavorites(favorites: Set<String>) {
+        prefs.edit().putStringSet(KEY_FAVORITES, favorites).apply()
+        _favoritesFlow.value = favorites
+    }
+
+    fun toggleFavorite(packageName: String) {
+        val current = getFavorites().toMutableSet()
+        if (current.contains(packageName)) {
+            current.remove(packageName)
+        } else {
+            current.add(packageName)
+        }
+        setFavorites(current)
+    }
+
+    // --- Hidden Apps ---
+    fun getHiddenApps(): Set<String> {
+        return prefs.getStringSet(KEY_HIDDEN_APPS, emptySet()) ?: emptySet()
+    }
+
+    fun setHiddenApps(hidden: Set<String>) {
+        prefs.edit().putStringSet(KEY_HIDDEN_APPS, hidden).apply()
+        _hiddenAppsFlow.value = hidden
+    }
+
+    fun setAppHidden(packageName: String, hidden: Boolean) {
+        val current = getHiddenApps().toMutableSet()
+        if (hidden) {
+            current.add(packageName)
+            // If hidden, also remove from favorites
+            val currentFavs = getFavorites().toMutableSet()
+            if (currentFavs.remove(packageName)) {
+                setFavorites(currentFavs)
+            }
+        } else {
+            current.remove(packageName)
+        }
+        setHiddenApps(current)
+    }
+
+    // --- Short-Video Blocker (ONE Global Toggle) ---
+    fun isShortVideoBlockerEnabled(): Boolean {
+        return prefs.getBoolean(KEY_SHORT_VIDEO_BLOCKER, false)
+    }
+
+    fun setShortVideoBlockerEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SHORT_VIDEO_BLOCKER, enabled).apply()
+        _shortVideoBlockerFlow.value = enabled
+    }
+
+    // --- Focus Mode ---
+    fun isFocusModeEnabled(): Boolean {
+        return prefs.getBoolean(KEY_FOCUS_MODE, false)
+    }
+
+    fun setFocusModeEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_FOCUS_MODE, enabled).apply()
+        _focusModeFlow.value = enabled
+    }
+
+    fun getFocusApps(): Set<String> {
+        return prefs.getStringSet(KEY_FOCUS_APPS, emptySet()) ?: emptySet()
+    }
+
+    fun setFocusApps(apps: Set<String>) {
+        prefs.edit().putStringSet(KEY_FOCUS_APPS, apps).apply()
+        _focusAppsFlow.value = apps
+    }
+
+    fun toggleFocusApp(packageName: String) {
+        val current = getFocusApps().toMutableSet()
+        if (current.contains(packageName)) {
+            current.remove(packageName)
+        } else {
+            current.add(packageName)
+        }
+        setFocusApps(current)
+    }
+
+    fun getFocusDurationMinutes(): Int {
+        return prefs.getInt(KEY_FOCUS_DURATION, 10)
+    }
+
+    fun setFocusDurationMinutes(minutes: Int) {
+        prefs.edit().putInt(KEY_FOCUS_DURATION, minutes).apply()
+    }
+
+    // --- Notification Filter ---
+    fun isNotificationManagerEnabled(): Boolean {
+        return prefs.getBoolean(KEY_NOTIFICATION_MANAGER, false)
+    }
+
+    fun setNotificationManagerEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_NOTIFICATION_MANAGER, enabled).apply()
+    }
+
+    fun getFilteredNotificationApps(): Set<String> {
+        return prefs.getStringSet(KEY_NOTIFICATION_APPS, emptySet()) ?: emptySet()
+    }
+
+    fun setFilteredNotificationApps(apps: Set<String>) {
+        prefs.edit().putStringSet(KEY_NOTIFICATION_APPS, apps).apply()
+    }
+
+    fun toggleFilteredNotificationApp(packageName: String) {
+        val current = getFilteredNotificationApps().toMutableSet()
+        if (current.contains(packageName)) {
+            current.remove(packageName)
+        } else {
+            current.add(packageName)
+        }
+        setFilteredNotificationApps(current)
+    }
+
+    fun getFilteredNotificationsJson(): String {
+        return prefs.getString(KEY_NOTIFICATIONS_JSON, "[]") ?: "[]"
+    }
+
+    fun setFilteredNotificationsJson(json: String) {
+        prefs.edit().putString(KEY_NOTIFICATIONS_JSON, json).apply()
+    }
+
+    // --- Theme & Appearance ---
+    fun getThemeMode(): String {
+        return prefs.getString(KEY_THEME_MODE, "SYSTEM") ?: "SYSTEM"
+    }
+
+    fun setThemeMode(mode: String) {
+        prefs.edit().putString(KEY_THEME_MODE, mode).apply()
+        _themeModeFlow.value = mode
+    }
+
+    companion object {
+        private const val PREFS_NAME = "unloop_launcher_prefs"
+        private const val KEY_FAVORITES = "pref_favorites"
+        private const val KEY_HIDDEN_APPS = "pref_hidden_apps"
+        private const val KEY_SHORT_VIDEO_BLOCKER = "pref_short_video_blocker"
+        private const val KEY_FOCUS_MODE = "pref_focus_mode"
+        private const val KEY_FOCUS_APPS = "pref_focus_apps"
+        private const val KEY_FOCUS_DURATION = "pref_focus_duration"
+        private const val KEY_NOTIFICATION_MANAGER = "pref_notification_manager"
+        private const val KEY_NOTIFICATION_APPS = "pref_notification_apps"
+        private const val KEY_NOTIFICATIONS_JSON = "pref_notifications_json"
+        private const val KEY_THEME_MODE = "pref_theme_mode"
+
+        @Volatile
+        private var instance: PreferencesManager? = null
+
+        fun getInstance(context: Context): PreferencesManager {
+            return instance ?: synchronized(this) {
+                instance ?: PreferencesManager(context.applicationContext).also { instance = it }
+            }
+        }
+    }
+}
