@@ -4,27 +4,29 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.unloop.launcher.data.AppItem
@@ -46,16 +48,72 @@ fun AllAppsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .safeDrawingPadding()
             .padding(horizontal = 24.dp)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 40.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Header with Back button and search query
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                if (searchResults.isEmpty()) {
+                    Text(
+                        text = "No applications found",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.secondary,
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        items(searchResults, key = { it.packageName }) { app ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .combinedClickable(
+                                        onClick = { onAppClick(app) },
+                                        onLongClick = { onAppLongClick(app) }
+                                    )
+                                    .padding(vertical = 10.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = app.label,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    textAlign = TextAlign.Center
+                                )
+
+                                if (app.isFavorite) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "★",
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AppSearchBar(
@@ -64,6 +122,7 @@ fun AllAppsScreen(
                     modifier = Modifier.weight(1f),
                     placeholderText = "Search apps...",
                     imeAction = ImeAction.Go,
+                    shape = CircleShape,
                     onImeAction = {
                         if (searchResults.size == 1) {
                             onAppClick(searchResults.first())
@@ -71,64 +130,17 @@ fun AllAppsScreen(
                     }
                 )
 
-                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
-                TextButton(onClick = onBackToHome) {
+                TextButton(
+                    onClick = onBackToHome,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                ) {
                     Text(
                         text = "Home",
                         color = MaterialTheme.colorScheme.secondary,
                         style = MaterialTheme.typography.titleMedium
                     )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Apps List
-            if (searchResults.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 48.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No applications found",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(searchResults, key = { it.packageName }) { app ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(
-                                    onClick = { onAppClick(app) },
-                                    onLongClick = { onAppLongClick(app) }
-                                )
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = app.label,
-                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp),
-                                color = MaterialTheme.colorScheme.onBackground,
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            if (app.isFavorite) {
-                                Text(
-                                    text = "★",
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    fontSize = 14.sp
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }

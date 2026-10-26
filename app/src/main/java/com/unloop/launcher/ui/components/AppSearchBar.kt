@@ -1,6 +1,7 @@
 package com.unloop.launcher.ui.components
 
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -28,7 +29,7 @@ fun AppSearchBar(
     placeholderText: String = "Search apps...",
     imeAction: ImeAction = ImeAction.Search,
     onImeAction: (() -> Unit)? = null,
-    shape: Shape = RoundedCornerShape(12.dp)
+    shape: Shape = CircleShape
 ) {
     OutlinedTextField(
         value = query,
