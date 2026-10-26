@@ -97,8 +97,11 @@ fun LauncherRoot(
                     isDefaultLauncher = isDefaultLauncher,
                     onAppClick = { viewModel.handleAppClick(it) },
                     onAppLongClick = { viewModel.setSelectedAppForMenu(it) },
-                    onOpenAllApps = { viewModel.navigateTo(LauncherScreen.ALL_APPS) },
+                    onOpenPhone = { viewModel.openPhone() },
+                    onOpenNotifications = { viewModel.openNotifications(LauncherScreen.HOME) },
+                    onOpenCamera = { viewModel.openCamera() },
                     onOpenSettings = { viewModel.navigateTo(LauncherScreen.SETTINGS) },
+                    onOpenAllApps = { viewModel.navigateTo(LauncherScreen.ALL_APPS) },
                     onRequestSetDefault = { viewModel.openSetDefaultLauncher(activity) }
                 )
             }
@@ -134,7 +137,7 @@ fun LauncherRoot(
                     onCancelPendingPermission = { viewModel.cancelPendingPermissions() },
                     onOpenFocusSettings = { viewModel.navigateTo(LauncherScreen.FOCUS_SETTINGS) },
                     onOpenHiddenApps = { viewModel.navigateTo(LauncherScreen.HIDDEN_APPS) },
-                    onOpenNotifications = { viewModel.navigateTo(LauncherScreen.NOTIFICATIONS) },
+                    onOpenNotifications = { viewModel.openNotifications(LauncherScreen.SETTINGS) },
                     onOpenScreenTime = { viewModel.openSystemDigitalWellbeing(activity) },
                     onChangeTheme = { viewModel.setThemeMode(it) },
                     onBackToHome = { viewModel.navigateTo(LauncherScreen.HOME) }
@@ -173,7 +176,7 @@ fun LauncherRoot(
                     onOpenNotificationSettings = { viewModel.openNotificationListenerSettings(activity) },
                     onCancelPendingPermission = { viewModel.cancelPendingPermissions() },
                     onClearAll = { viewModel.clearFilteredNotifications() },
-                    onBack = { viewModel.navigateTo(LauncherScreen.SETTINGS) }
+                    onBack = { viewModel.backFromNotifications() }
                 )
             }
         }

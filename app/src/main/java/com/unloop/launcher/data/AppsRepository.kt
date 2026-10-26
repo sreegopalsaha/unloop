@@ -110,4 +110,95 @@ class AppsRepository(
             context.startActivity(intent)
         } catch (_: Exception) {}
     }
+
+    fun openPhone(): Boolean {
+        // 1. Standard dialer intent
+        try {
+            val intent = Intent(Intent.ACTION_DIAL).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (intent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(intent)
+                return true
+            }
+        } catch (_: Exception) {}
+
+        // 2. TelecomManager default dialer package
+        try {
+            val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+            val defaultDialer = telecomManager?.defaultDialerPackage
+            if (!defaultDialer.isNullOrBlank()) {
+                val launchIntent = context.packageManager.getLaunchIntentForPackage(defaultDialer)
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(launchIntent)
+                    return true
+                }
+            }
+        } catch (_: Exception) {}
+
+        // 3. Fallback: ACTION_VIEW tel:
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("tel:")).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (intent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(intent)
+                return true
+            }
+        } catch (_: Exception) {}
+
+        // 4. Fallback: direct start ACTION_DIAL
+        try {
+            val intent = Intent(Intent.ACTION_DIAL).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            return true
+        } catch (_: Exception) {}
+
+        return false
+    }
+
+    fun openCamera(): Boolean {
+        // 1. Standard camera intents
+        val cameraIntents = listOf(
+            Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA),
+            Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE),
+            Intent("android.media.action.STILL_IMAGE_CAMERA_SECURE")
+        )
+        for (intent in cameraIntents) {
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                    return true
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 2. Fallback: Search installed apps for any camera package or label
+        try {
+            val cameraKeywords = listOf("camera", "cam")
+            val cameraApp = _appsFlow.value.firstOrNull { app ->
+                val pkgLower = app.packageName.lowercase()
+                val labelLower = app.label.lowercase()
+                cameraKeywords.any { pkgLower.contains(it) || labelLower.contains(it) }
+            }
+            if (cameraApp != null && launchApp(cameraApp.packageName)) {
+                return true
+            }
+        } catch (_: Exception) {}
+
+        // 3. Fallback: direct start STILL_IMAGE_CAMERA
+        try {
+            val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            return true
+        } catch (_: Exception) {}
+
+        return false
+    }
 }

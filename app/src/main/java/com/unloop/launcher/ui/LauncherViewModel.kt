@@ -222,11 +222,30 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    private var notificationSourceScreen: LauncherScreen = LauncherScreen.HOME
+
     fun navigateTo(screen: LauncherScreen) {
         if (screen == LauncherScreen.ALL_APPS && _currentScreen.value != LauncherScreen.ALL_APPS) {
             _searchQuery.value = ""
         }
         _currentScreen.value = screen
+    }
+
+    fun openNotifications(fromScreen: LauncherScreen = _currentScreen.value) {
+        notificationSourceScreen = fromScreen
+        navigateTo(LauncherScreen.NOTIFICATIONS)
+    }
+
+    fun backFromNotifications() {
+        navigateTo(notificationSourceScreen)
+    }
+
+    fun openPhone() {
+        repository.openPhone()
+    }
+
+    fun openCamera() {
+        repository.openCamera()
     }
 
     fun updateSearchQuery(query: String) {

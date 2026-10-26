@@ -12,13 +12,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Phone
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.unloop.launcher.data.AppItem
+import com.unloop.launcher.ui.components.onSwipeUp
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -43,8 +51,11 @@ fun HomeScreen(
     isDefaultLauncher: Boolean,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem) -> Unit,
-    onOpenAllApps: () -> Unit,
+    onOpenPhone: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenCamera: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAllApps: () -> Unit,
     onRequestSetDefault: () -> Unit
 ) {
     var currentTime by remember { mutableStateOf(getCurrentTimeString()) }
@@ -63,6 +74,7 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .onSwipeUp { onOpenAllApps() }
             .padding(horizontal = 24.dp)
     ) {
         Column(
@@ -126,7 +138,7 @@ fun HomeScreen(
                     contentAlignment = Alignment.CenterStart
                 ) {
                     Text(
-                        text = "No favorite apps yet.\nTap 'All apps' below and long-press any app to add it here.",
+                        text = "No favorite apps yet.\nSwipe up to open all apps and long-press any app to add it here.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.secondary,
                         lineHeight = 26.sp
@@ -155,28 +167,60 @@ fun HomeScreen(
             }
         }
 
-        // Bottom Navigation Bar
+        // Fixed Bottom Dock with 4 Minimal Monochrome Icons
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .padding(bottom = 20.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onOpenAllApps) {
-                Text(
-                    text = "All apps",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground
+            IconButton(
+                onClick = onOpenPhone,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Phone,
+                    contentDescription = "Phone",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            TextButton(onClick = onOpenSettings) {
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.secondary
+            IconButton(
+                onClick = onOpenNotifications,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Notifications,
+                    contentDescription = "Notifications",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onOpenCamera,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.PhotoCamera,
+                    contentDescription = "Camera",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = "Settings",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
