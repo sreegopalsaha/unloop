@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.provider.CallLog
+import android.telecom.TelecomManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -112,7 +114,50 @@ class AppsRepository(
     }
 
     fun openPhone(): Boolean {
-        // 1. Standard dialer intent
+        // 1. TelecomManager default dialer package (launches phone app's main/home screen)
+        try {
+            val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+            val defaultDialer = telecomManager?.defaultDialerPackage
+            if (!defaultDialer.isNullOrBlank() && launchApp(defaultDialer)) {
+                return true
+            }
+        } catch (_: Exception) {}
+
+        // 2. Resolve package handling ACTION_DIAL and launch its main screen
+        try {
+            val dialIntent = Intent(Intent.ACTION_DIAL)
+            val resolveInfo = context.packageManager.resolveActivity(dialIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            val pkg = resolveInfo?.activityInfo?.packageName
+            if (!pkg.isNullOrBlank() && pkg != "android" && pkg != context.packageName && launchApp(pkg)) {
+                return true
+            }
+        } catch (_: Exception) {}
+
+        // 3. Query all packages handling ACTION_DIAL and launch the first valid one's main screen
+        try {
+            val dialIntent = Intent(Intent.ACTION_DIAL)
+            val activities = context.packageManager.queryIntentActivities(dialIntent, 0)
+            for (info in activities) {
+                val dialerPkg = info.activityInfo?.packageName
+                if (!dialerPkg.isNullOrBlank() && dialerPkg != "android" && dialerPkg != context.packageName && launchApp(dialerPkg)) {
+                    return true
+                }
+            }
+        } catch (_: Exception) {}
+
+        // 4. Intent for Call Log / Recents screen
+        try {
+            val callLogIntent = Intent(Intent.ACTION_VIEW).apply {
+                type = CallLog.Calls.CONTENT_TYPE
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (callLogIntent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(callLogIntent)
+                return true
+            }
+        } catch (_: Exception) {}
+
+        // 5. Fallback: Standard dialer intent (opens dial pad if no main screen could be launched)
         try {
             val intent = Intent(Intent.ACTION_DIAL).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -123,32 +168,7 @@ class AppsRepository(
             }
         } catch (_: Exception) {}
 
-        // 2. TelecomManager default dialer package
-        try {
-            val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
-            val defaultDialer = telecomManager?.defaultDialerPackage
-            if (!defaultDialer.isNullOrBlank()) {
-                val launchIntent = context.packageManager.getLaunchIntentForPackage(defaultDialer)
-                if (launchIntent != null) {
-                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(launchIntent)
-                    return true
-                }
-            }
-        } catch (_: Exception) {}
-
-        // 3. Fallback: ACTION_VIEW tel:
-        try {
-            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("tel:")).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            if (intent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(intent)
-                return true
-            }
-        } catch (_: Exception) {}
-
-        // 4. Fallback: direct start ACTION_DIAL
+        // 6. Fallback: direct start ACTION_DIAL
         try {
             val intent = Intent(Intent.ACTION_DIAL).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
