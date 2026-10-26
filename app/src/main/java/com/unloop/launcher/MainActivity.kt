@@ -147,12 +147,11 @@ fun LauncherRoot(
             LauncherScreen.FOCUS_SETTINGS -> {
                 FocusSettingsScreen(
                     focusModeEnabled = focusModeEnabled,
-                    focusDurationMinutes = viewModel.getFocusDurationMinutes(),
                     focusApps = focusApps,
                     allApps = visibleApps,
                     onToggleFocusMode = { viewModel.setFocusModeEnabled(it) },
-                    onChangeDuration = { viewModel.setFocusDurationMinutes(it) },
                     onToggleAppRestriction = { viewModel.toggleFocusRestriction(it) },
+                    onSetFocusApps = { viewModel.setFocusApps(it) },
                     onBack = { viewModel.navigateTo(LauncherScreen.SETTINGS) }
                 )
             }

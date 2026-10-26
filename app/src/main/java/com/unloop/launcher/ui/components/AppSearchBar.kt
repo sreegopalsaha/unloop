@@ -1,18 +1,24 @@
 package com.unloop.launcher.ui.components
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 @Composable
 fun AppSearchBar(
@@ -21,7 +27,8 @@ fun AppSearchBar(
     modifier: Modifier = Modifier,
     placeholderText: String = "Search apps...",
     imeAction: ImeAction = ImeAction.Search,
-    onImeAction: (() -> Unit)? = null
+    onImeAction: (() -> Unit)? = null,
+    shape: Shape = RoundedCornerShape(12.dp)
 ) {
     OutlinedTextField(
         value = query,
@@ -33,19 +40,28 @@ fun AppSearchBar(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search",
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(20.dp)
+            )
+        },
         trailingIcon = if (query.isNotEmpty()) {
             {
-                Text(
-                    text = "✕",
-                    color = MaterialTheme.colorScheme.secondary,
-                    fontSize = 14.sp,
-                    modifier = Modifier
-                        .clickable { onQueryChange("") }
-                        .padding(8.dp)
-                )
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Clear search",
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         } else null,
         singleLine = true,
+        shape = shape,
         keyboardOptions = KeyboardOptions(imeAction = imeAction),
         keyboardActions = KeyboardActions(
             onSearch = { onImeAction?.invoke() },
@@ -53,10 +69,13 @@ fun AppSearchBar(
             onDone = { onImeAction?.invoke() }
         ),
         colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedBorderColor = Color.Transparent,
             focusedTextColor = MaterialTheme.colorScheme.onBackground,
-            unfocusedTextColor = MaterialTheme.colorScheme.onBackground
+            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+            cursorColor = MaterialTheme.colorScheme.primary
         )
     )
 }

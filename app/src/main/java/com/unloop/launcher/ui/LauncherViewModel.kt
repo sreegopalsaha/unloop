@@ -289,6 +289,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         refreshApps()
     }
 
+    fun setFocusApps(apps: Set<String>) {
+        prefs.setFocusApps(apps)
+        refreshApps()
+    }
+
     fun openAppDetails(app: AppItem) {
         repository.openAppDetails(app.packageName)
     }

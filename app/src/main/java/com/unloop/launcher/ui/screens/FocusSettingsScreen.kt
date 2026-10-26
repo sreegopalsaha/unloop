@@ -37,13 +37,14 @@ import com.unloop.launcher.util.AppSearchEngine
 @Composable
 fun FocusSettingsScreen(
     focusModeEnabled: Boolean,
-    focusDurationMinutes: Int,
     focusApps: Set<String>,
     allApps: List<AppItem>,
     onToggleFocusMode: (Boolean) -> Unit,
-    onChangeDuration: (Int) -> Unit,
     onToggleAppRestriction: (AppItem) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSetFocusApps: ((Set<String>) -> Unit)? = null,
+    focusDurationMinutes: Int = 10,
+    onChangeDuration: (Int) -> Unit = {}
 ) {
     BackHandler(onBack = onBack)
 
@@ -120,49 +121,48 @@ fun FocusSettingsScreen(
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Duration selector
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Default session duration",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground
+                    text = "SELECT DISTRACTING APPLICATIONS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary
                 )
 
-                TextButton(
-                    onClick = {
-                        val next = when (focusDurationMinutes) {
-                            5 -> 10
-                            10 -> 15
-                            15 -> 20
-                            20 -> 30
-                            else -> 5
-                        }
-                        onChangeDuration(next)
-                    }
-                ) {
+                if (filteredApps.isNotEmpty()) {
+                    val allFilteredSelected = filteredApps.all { focusApps.contains(it.packageName) }
                     Text(
-                        text = "$focusDurationMinutes min",
+                        text = if (allFilteredSelected) "Deselect all" else "Select all",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.titleMedium
+                        modifier = Modifier
+                            .clickable {
+                                val filteredPackageNames = filteredApps.map { it.packageName }.toSet()
+                                val newFocusApps = if (allFilteredSelected) {
+                                    focusApps - filteredPackageNames
+                                } else {
+                                    focusApps + filteredPackageNames
+                                }
+                                if (onSetFocusApps != null) {
+                                    onSetFocusApps(newFocusApps)
+                                } else {
+                                    val toToggle = if (allFilteredSelected) {
+                                        filteredApps.filter { focusApps.contains(it.packageName) }
+                                    } else {
+                                        filteredApps.filterNot { focusApps.contains(it.packageName) }
+                                    }
+                                    toToggle.forEach { onToggleAppRestriction(it) }
+                                }
+                            }
+                            .padding(vertical = 4.dp, horizontal = 4.dp)
                     )
                 }
             }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "SELECT DISTRACTING APPLICATIONS",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
