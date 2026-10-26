@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Unloop</string>
+    <string name="accessibility_service_description">Used by Unloop to block distracting short-form video interfaces (YouTube Shorts, Instagram Reels, Snapchat Spotlight, Facebook Reels) and support mindful focus.</string>
 </resources>
