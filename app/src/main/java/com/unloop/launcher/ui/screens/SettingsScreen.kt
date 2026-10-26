@@ -122,9 +122,10 @@ fun SettingsScreen(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
+            val appearanceLabel = themeMode.lowercase().replaceFirstChar { it.titlecase() }
             SettingItem(
-                title = "Appearance",
-                subtitle = "Choose light, dark, or system theme",
+                title = "Appearance: $appearanceLabel",
+                subtitle = "Tap to choose light, dark, or system theme",
                 onClick = {
                     val nextMode = when (themeMode) {
                         "DARK" -> "LIGHT"
