@@ -25,6 +25,7 @@ import com.unloop.launcher.data.AppItem
 @Composable
 fun HiddenAppsScreen(
     hiddenApps: List<AppItem>,
+    onOpenApp: (AppItem) -> Unit,
     onUnhideApp: (AppItem) -> Unit,
     onBack: () -> Unit
 ) {
@@ -99,11 +100,22 @@ fun HiddenAppsScreen(
                                 modifier = Modifier.weight(1f)
                             )
 
-                            TextButton(onClick = { onUnhideApp(app) }) {
-                                Text(
-                                    text = "Unhide",
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(onClick = { onOpenApp(app) }) {
+                                    Text(
+                                        text = "Open",
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
+                                TextButton(onClick = { onUnhideApp(app) }) {
+                                    Text(
+                                        text = "Unhide",
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         }
                     }

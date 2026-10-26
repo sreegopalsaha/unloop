@@ -157,6 +157,7 @@ fun LauncherRoot(
             LauncherScreen.HIDDEN_APPS -> {
                 HiddenAppsScreen(
                     hiddenApps = hiddenAppsList,
+                    onOpenApp = { viewModel.handleAppClick(it) },
                     onUnhideApp = { viewModel.setAppHidden(it, false) },
                     onBack = { viewModel.navigateTo(LauncherScreen.SETTINGS) }
                 )
