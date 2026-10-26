@@ -1,8 +1,5 @@
 package com.unloop.launcher.ui.screens
 
-import android.content.Context
-import android.content.Intent
-import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,23 +22,30 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.unloop.launcher.service.FilteredNotificationItem
+import com.unloop.launcher.ui.components.PermissionRationaleDialog
 
 @Composable
 fun NotificationsScreen(
     notificationsEnabled: Boolean,
     notifications: List<FilteredNotificationItem>,
-    onToggleNotifications: (Boolean) -> Unit,
+    onToggleNotifications: (Boolean, () -> Unit) -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    onCancelPendingPermission: () -> Unit,
     onClearAll: () -> Unit,
     onBack: () -> Unit
 ) {
     BackHandler(onBack = onBack)
-    val context = LocalContext.current
+
+    var showPermissionDialog by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -90,15 +94,20 @@ fun NotificationsScreen(
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onBackground
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Suppresses distracting status bar alerts and stores them locally",
+                        text = "Quiet distracting alerts and view them inside Unloop",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Switch(
                     checked = notificationsEnabled,
-                    onCheckedChange = onToggleNotifications,
+                    onCheckedChange = { targetState ->
+                        onToggleNotifications(targetState) {
+                            showPermissionDialog = true
+                        }
+                    },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = MaterialTheme.colorScheme.background,
                         checkedTrackColor = MaterialTheme.colorScheme.primary
@@ -106,20 +115,13 @@ fun NotificationsScreen(
                 )
             }
 
-            // Notification Access Permission Button
+            // Notification Access Permission Link
             TextButton(
-                onClick = {
-                    try {
-                        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(intent)
-                    } catch (_: Exception) {}
-                }
+                onClick = onOpenNotificationSettings
             ) {
                 Text(
-                    text = "Open Notification Access Settings →",
-                    color = MaterialTheme.colorScheme.primary,
+                    text = if (notificationsEnabled) "Notification Access: Active →" else "Enable Notification Access in Android Settings →",
+                    color = if (notificationsEnabled) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -153,7 +155,9 @@ fun NotificationsScreen(
 
             if (notifications.isEmpty()) {
                 Box(
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -211,5 +215,22 @@ fun NotificationsScreen(
                 }
             }
         }
+    }
+
+    if (showPermissionDialog) {
+        PermissionRationaleDialog(
+            title = "Notification Access Required",
+            message = "Notification Manager requires Notification Access to filter distracting notifications from your status bar and store them privately for mindful review.\n\nYour notifications are stored locally on your device and never leave Unloop.",
+            confirmButtonText = "Open Settings",
+            dismissButtonText = "Cancel",
+            onConfirm = {
+                showPermissionDialog = false
+                onOpenNotificationSettings()
+            },
+            onDismiss = {
+                showPermissionDialog = false
+                onCancelPendingPermission()
+            }
+        )
     }
 }

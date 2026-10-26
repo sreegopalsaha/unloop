@@ -52,4 +52,19 @@ class AppSearchEngineTest {
         val results = AppSearchEngine.filterAndRank(sampleApps, "spt")
         assertTrue(results.any { it.label == "Spotify" })
     }
+
+    @Test
+    fun testFilterAndRank_blankQuery_returnsAll() {
+        val resultsEmpty = AppSearchEngine.filterAndRank(sampleApps, "")
+        assertEquals(sampleApps.size, resultsEmpty.size)
+
+        val resultsWhitespace = AppSearchEngine.filterAndRank(sampleApps, "   ")
+        assertEquals(sampleApps.size, resultsWhitespace.size)
+    }
+
+    @Test
+    fun testFilterAndRank_noMatch_returnsEmpty() {
+        val results = AppSearchEngine.filterAndRank(sampleApps, "zzzzzz")
+        assertTrue(results.isEmpty())
+    }
 }

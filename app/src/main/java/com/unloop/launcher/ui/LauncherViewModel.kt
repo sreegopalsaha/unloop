@@ -12,6 +12,7 @@ import com.unloop.launcher.data.AppItem
 import com.unloop.launcher.data.AppsRepository
 import com.unloop.launcher.data.PreferencesManager
 import com.unloop.launcher.util.AppSearchEngine
+import com.unloop.launcher.util.PermissionUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -77,16 +78,120 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         apps.filter { hidden.contains(it.packageName) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Permissions tracking
+    private val _isAccessibilityPermissionGranted = MutableStateFlow(PermissionUtils.isAccessibilityServiceEnabled(application))
+    val isAccessibilityPermissionGranted: StateFlow<Boolean> = _isAccessibilityPermissionGranted.asStateFlow()
+
+    private val _isNotificationPermissionGranted = MutableStateFlow(PermissionUtils.isNotificationListenerEnabled(application))
+    val isNotificationPermissionGranted: StateFlow<Boolean> = _isNotificationPermissionGranted.asStateFlow()
+
+    private var pendingEnableShortVideoBlocker = false
+    private var pendingEnableNotificationManager = false
+
     // Settings flows
-    val shortVideoBlockerEnabled: StateFlow<Boolean> = prefs.shortVideoBlockerFlow
+    val shortVideoBlockerEnabled: StateFlow<Boolean> = combine(
+        prefs.shortVideoBlockerFlow,
+        _isAccessibilityPermissionGranted
+    ) { enabled, granted ->
+        enabled && granted
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val focusModeEnabled: StateFlow<Boolean> = prefs.focusModeFlow
     val focusApps: StateFlow<Set<String>> = prefs.focusAppsFlow
     val themeMode: StateFlow<String> = prefs.themeModeFlow
-    val notificationManagerEnabled = MutableStateFlow(prefs.isNotificationManagerEnabled())
+
+    val notificationManagerEnabled: StateFlow<Boolean> = combine(
+        prefs.notificationManagerFlow,
+        _isNotificationPermissionGranted
+    ) { enabled, granted ->
+        enabled && granted
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun setNotificationManagerEnabled(enabled: Boolean) {
         prefs.setNotificationManagerEnabled(enabled)
-        notificationManagerEnabled.value = enabled
+    }
+
+    fun requestToggleShortVideoBlocker(
+        enabled: Boolean,
+        onShowRationaleDialog: () -> Unit
+    ) {
+        if (enabled) {
+            val granted = PermissionUtils.isAccessibilityServiceEnabled(getApplication())
+            _isAccessibilityPermissionGranted.value = granted
+            if (granted) {
+                prefs.setShortVideoBlockerEnabled(true)
+            } else {
+                pendingEnableShortVideoBlocker = true
+                onShowRationaleDialog()
+            }
+        } else {
+            pendingEnableShortVideoBlocker = false
+            prefs.setShortVideoBlockerEnabled(false)
+        }
+    }
+
+    fun requestToggleNotificationManager(
+        enabled: Boolean,
+        onShowRationaleDialog: () -> Unit
+    ) {
+        if (enabled) {
+            val granted = PermissionUtils.isNotificationListenerEnabled(getApplication())
+            _isNotificationPermissionGranted.value = granted
+            if (granted) {
+                prefs.setNotificationManagerEnabled(true)
+            } else {
+                pendingEnableNotificationManager = true
+                onShowRationaleDialog()
+            }
+        } else {
+            pendingEnableNotificationManager = false
+            prefs.setNotificationManagerEnabled(false)
+        }
+    }
+
+    fun cancelPendingPermissions() {
+        pendingEnableShortVideoBlocker = false
+        pendingEnableNotificationManager = false
+    }
+
+    fun checkPermissions() {
+        val context = getApplication<Application>()
+        val accessibilityGranted = PermissionUtils.isAccessibilityServiceEnabled(context)
+        val notificationGranted = PermissionUtils.isNotificationListenerEnabled(context)
+
+        _isAccessibilityPermissionGranted.value = accessibilityGranted
+        _isNotificationPermissionGranted.value = notificationGranted
+
+        // If permission was revoked outside the app, sync preference
+        if (!accessibilityGranted && prefs.isShortVideoBlockerEnabled()) {
+            prefs.setShortVideoBlockerEnabled(false)
+        }
+        if (!notificationGranted && prefs.isNotificationManagerEnabled()) {
+            prefs.setNotificationManagerEnabled(false)
+        }
+
+        // Handle returning from system settings when user was prompted to enable a feature
+        if (pendingEnableShortVideoBlocker) {
+            if (accessibilityGranted) {
+                prefs.setShortVideoBlockerEnabled(true)
+            }
+            pendingEnableShortVideoBlocker = false
+        }
+
+        if (pendingEnableNotificationManager) {
+            if (notificationGranted) {
+                prefs.setNotificationManagerEnabled(true)
+            }
+            pendingEnableNotificationManager = false
+        }
+    }
+
+    fun openAccessibilitySettings(context: Context) {
+        PermissionUtils.openAccessibilitySettings(context)
+    }
+
+    fun openNotificationListenerSettings(context: Context) {
+        PermissionUtils.openNotificationListenerSettings(context)
     }
 
     fun getFilteredNotifications(): List<com.unloop.launcher.service.FilteredNotificationItem> {
@@ -113,6 +218,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repository.refreshApps()
             checkDefaultStatus()
+            checkPermissions()
         }
     }
 

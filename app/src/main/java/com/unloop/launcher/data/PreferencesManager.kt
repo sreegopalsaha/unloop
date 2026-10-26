@@ -28,6 +28,9 @@ class PreferencesManager(context: Context) {
     private val _themeModeFlow = MutableStateFlow(getThemeMode())
     val themeModeFlow: StateFlow<String> = _themeModeFlow.asStateFlow()
 
+    private val _notificationManagerFlow = MutableStateFlow(isNotificationManagerEnabled())
+    val notificationManagerFlow: StateFlow<Boolean> = _notificationManagerFlow.asStateFlow()
+
     // --- Favorites ---
     fun getFavorites(): Set<String> {
         return prefs.getStringSet(KEY_FAVORITES, emptySet()) ?: emptySet()
@@ -127,6 +130,7 @@ class PreferencesManager(context: Context) {
 
     fun setNotificationManagerEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_NOTIFICATION_MANAGER, enabled).apply()
+        _notificationManagerFlow.value = enabled
     }
 
     fun getFilteredNotificationApps(): Set<String> {

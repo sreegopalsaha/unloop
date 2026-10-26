@@ -23,10 +23,16 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.unloop.launcher.data.AppItem
+import com.unloop.launcher.ui.components.AppSearchBar
+import com.unloop.launcher.util.AppSearchEngine
 
 @Composable
 fun FocusSettingsScreen(
@@ -40,6 +46,15 @@ fun FocusSettingsScreen(
     onBack: () -> Unit
 ) {
     BackHandler(onBack = onBack)
+
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredApps = remember(allApps, searchQuery) {
+        if (searchQuery.isBlank()) {
+            allApps
+        } else {
+            AppSearchEngine.filterAndRank(allApps, searchQuery)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -151,32 +166,58 @@ fun FocusSettingsScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(allApps, key = { it.packageName }) { app ->
-                    val isChecked = focusApps.contains(app.packageName)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onToggleAppRestriction(app) }
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = app.label,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.weight(1f)
-                        )
+            // Reusable AppSearchBar
+            AppSearchBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                placeholderText = "Search apps...",
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                        Checkbox(
-                            checked = isChecked,
-                            onCheckedChange = { onToggleAppRestriction(app) },
-                            colors = CheckboxDefaults.colors(
-                                checkedColor = MaterialTheme.colorScheme.primary,
-                                checkmarkColor = MaterialTheme.colorScheme.background
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (filteredApps.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(top = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No applications found",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            } else {
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(filteredApps, key = { it.packageName }) { app ->
+                        val isChecked = focusApps.contains(app.packageName)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onToggleAppRestriction(app) }
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = app.label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.weight(1f)
                             )
-                        )
+
+                            Checkbox(
+                                checked = isChecked,
+                                onCheckedChange = { onToggleAppRestriction(app) },
+                                colors = CheckboxDefaults.colors(
+                                    checkedColor = MaterialTheme.colorScheme.primary,
+                                    checkmarkColor = MaterialTheme.colorScheme.background
+                                )
+                            )
+                        }
                     }
                 }
             }

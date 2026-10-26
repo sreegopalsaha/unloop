@@ -1,6 +1,7 @@
 package com.unloop.launcher.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
@@ -18,7 +19,7 @@ class ShortVideoBlockerAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val DEBOUNCE_MS = 1000L
-        private const val ACTION_DELAY_MS = 500L
+        private const val ACTION_DELAY_MS = 400L
 
         private val _currentForegroundApp = MutableStateFlow<String?>(null)
         val currentForegroundApp: StateFlow<String?> = _currentForegroundApp.asStateFlow()
@@ -47,12 +48,12 @@ class ShortVideoBlockerAccessibilityService : AccessibilityService() {
             prefs = PreferencesManager.getInstance(this)
         }
 
-        // Single Global Short-Video Blocker Toggle Check
+        // Check if Short-Video Blocker is enabled in preferences
         if (!prefs.isShortVideoBlockerEnabled()) {
             return
         }
 
-        // Only inspect supported target video apps
+        // Only inspect supported target short-video apps
         if (!ShortVideoDetector.SUPPORTED_PACKAGES.contains(pkg)) {
             return
         }
@@ -62,25 +63,48 @@ class ShortVideoBlockerAccessibilityService : AccessibilityService() {
             return
         }
 
-        val rootNode = try {
+        val rootNode = (try {
             rootInActiveWindow
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
-        } ?: return
+        }) ?: event.source ?: return
 
         val isShortVideo = ShortVideoDetector.isShortVideoInterface(rootNode, pkg)
         if (isShortVideo) {
             lastActionTime = now
 
-            // 500ms delay to ensure transition stability before popping the modal viewer
+            // Delay to allow UI transition stability before exiting short-video player
             mainHandler.postDelayed({
-                val performed = performGlobalAction(GLOBAL_ACTION_BACK)
-                if (performed) {
-                    Toast.makeText(
-                        applicationContext,
-                        "Short videos blocked by Unloop",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                val currentRoot = try {
+                    rootInActiveWindow
+                } catch (_: Exception) {
+                    null
+                }
+
+                // Verify user is still in the target package and still in a short-video interface
+                val stillInTargetApp = _currentForegroundApp.value == pkg
+                val stillInShorts = if (currentRoot != null) {
+                    ShortVideoDetector.isShortVideoInterface(currentRoot, pkg)
+                } else {
+                    stillInTargetApp
+                }
+
+                if (stillInTargetApp && stillInShorts) {
+                    val performed = performGlobalAction(GLOBAL_ACTION_BACK)
+                    if (performed) {
+                        Toast.makeText(
+                            applicationContext,
+                            "Short videos blocked by Unloop",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        // Fallback to launcher home screen if back action fails
+                        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                            addCategory(Intent.CATEGORY_HOME)
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        startActivity(homeIntent)
+                    }
                 }
             }, ACTION_DELAY_MS)
         }

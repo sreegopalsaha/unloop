@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         viewModel.refreshApps()
         viewModel.checkDefaultStatus()
+        viewModel.checkPermissions()
     }
 }
 
@@ -118,10 +119,19 @@ fun LauncherRoot(
                     isDefaultLauncher = isDefaultLauncher,
                     shortVideoBlockerEnabled = shortVideoBlockerEnabled,
                     focusModeEnabled = focusModeEnabled,
+                    notificationManagerEnabled = notificationManagerEnabled,
                     themeMode = themeMode,
                     onSetDefaultLauncher = { viewModel.openSetDefaultLauncher(activity) },
-                    onToggleShortVideoBlocker = { viewModel.setShortVideoBlockerEnabled(it) },
+                    onToggleShortVideoBlocker = { enabled, onShowRationale ->
+                        viewModel.requestToggleShortVideoBlocker(enabled, onShowRationale)
+                    },
                     onToggleFocusMode = { viewModel.setFocusModeEnabled(it) },
+                    onToggleNotificationManager = { enabled, onShowRationale ->
+                        viewModel.requestToggleNotificationManager(enabled, onShowRationale)
+                    },
+                    onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings(activity) },
+                    onOpenNotificationSettings = { viewModel.openNotificationListenerSettings(activity) },
+                    onCancelPendingPermission = { viewModel.cancelPendingPermissions() },
                     onOpenFocusSettings = { viewModel.navigateTo(LauncherScreen.FOCUS_SETTINGS) },
                     onOpenHiddenApps = { viewModel.navigateTo(LauncherScreen.HIDDEN_APPS) },
                     onOpenNotifications = { viewModel.navigateTo(LauncherScreen.NOTIFICATIONS) },
@@ -156,7 +166,11 @@ fun LauncherRoot(
                 NotificationsScreen(
                     notificationsEnabled = notificationManagerEnabled,
                     notifications = viewModel.getFilteredNotifications(),
-                    onToggleNotifications = { viewModel.setNotificationManagerEnabled(it) },
+                    onToggleNotifications = { enabled, onShowRationale ->
+                        viewModel.requestToggleNotificationManager(enabled, onShowRationale)
+                    },
+                    onOpenNotificationSettings = { viewModel.openNotificationListenerSettings(activity) },
+                    onCancelPendingPermission = { viewModel.cancelPendingPermissions() },
                     onClearAll = { viewModel.clearFilteredNotifications() },
                     onBack = { viewModel.navigateTo(LauncherScreen.SETTINGS) }
                 )

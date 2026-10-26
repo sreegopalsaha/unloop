@@ -28,6 +28,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.unloop.launcher.data.AppItem
+import com.unloop.launcher.ui.components.AppSearchBar
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -57,31 +58,17 @@ fun AllAppsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
+                AppSearchBar(
+                    query = searchQuery,
+                    onQueryChange = onSearchQueryChange,
                     modifier = Modifier.weight(1f),
-                    placeholder = {
-                        Text(
-                            text = "Search apps...",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                    keyboardActions = KeyboardActions(
-                        onGo = {
-                            if (searchResults.size == 1) {
-                                onAppClick(searchResults.first())
-                            }
+                    placeholderText = "Search apps...",
+                    imeAction = ImeAction.Go,
+                    onImeAction = {
+                        if (searchResults.size == 1) {
+                            onAppClick(searchResults.first())
                         }
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onBackground
-                    )
+                    }
                 )
 
                 Spacer(modifier = Modifier.padding(horizontal = 4.dp))
