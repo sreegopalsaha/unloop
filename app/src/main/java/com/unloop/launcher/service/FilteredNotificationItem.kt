@@ -39,7 +39,7 @@ data class FilteredNotificationItem(
             )
         }
 
-        private fun formatTimestamp(time: Long): String {
+        fun formatTimestamp(time: Long): String {
             return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(time))
         }
     }

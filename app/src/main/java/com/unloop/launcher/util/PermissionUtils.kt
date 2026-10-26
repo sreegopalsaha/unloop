@@ -5,6 +5,8 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
 import android.provider.Settings
 import android.text.TextUtils
 import android.view.accessibility.AccessibilityManager
@@ -129,5 +131,50 @@ object PermissionUtils {
                 return
             } catch (_: Exception) {}
         }
+    }
+
+    /**
+     * Checks if Unloop is currently exempt from battery optimization.
+     */
+    fun isBatteryOptimizationIgnored(context: Context): Boolean {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
+        return pm.isIgnoringBatteryOptimizations(context.packageName)
+    }
+
+    /**
+     * Guides the user to grant unrestricted battery usage or request battery optimization exemption.
+     */
+    fun requestIgnoreBatteryOptimization(context: Context) {
+        val directIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = Uri.parse("package:${context.packageName}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(directIntent)
+            return
+        } catch (_: Exception) {}
+
+        openBatteryOptimizationSettings(context)
+    }
+
+    /**
+     * Opens system battery optimization settings or App info details.
+     */
+    fun openBatteryOptimizationSettings(context: Context) {
+        val settingsIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(settingsIntent)
+            return
+        } catch (_: Exception) {}
+
+        try {
+            val detailsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(detailsIntent)
+        } catch (_: Exception) {}
     }
 }

@@ -2,9 +2,11 @@ package com.unloop.launcher.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.unloop.launcher.service.FilteredNotificationItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
 
 class PreferencesManager(context: Context) {
 
@@ -30,6 +32,23 @@ class PreferencesManager(context: Context) {
 
     private val _notificationManagerFlow = MutableStateFlow(isNotificationManagerEnabled())
     val notificationManagerFlow: StateFlow<Boolean> = _notificationManagerFlow.asStateFlow()
+
+    private val _filteredNotificationsFlow = MutableStateFlow(loadFilteredNotifications())
+    val filteredNotificationsFlow: StateFlow<List<FilteredNotificationItem>> = _filteredNotificationsFlow.asStateFlow()
+
+    init {
+        prefs.registerOnSharedPreferenceChangeListener { _, key ->
+            when (key) {
+                KEY_NOTIFICATIONS_JSON -> {
+                    val updated = loadFilteredNotifications()
+                    _filteredNotificationsFlow.value = updated
+                }
+                KEY_NOTIFICATION_MANAGER -> {
+                    _notificationManagerFlow.value = isNotificationManagerEnabled()
+                }
+            }
+        }
+    }
 
     // --- Favorites ---
     fun getFavorites(): Set<String> {
@@ -151,12 +170,73 @@ class PreferencesManager(context: Context) {
         setFilteredNotificationApps(current)
     }
 
+    private fun loadFilteredNotifications(): List<FilteredNotificationItem> {
+        val jsonStr = prefs.getString(KEY_NOTIFICATIONS_JSON, "[]") ?: "[]"
+        val list = mutableListOf<FilteredNotificationItem>()
+        try {
+            val jsonArray = JSONArray(jsonStr)
+            for (i in 0 until jsonArray.length()) {
+                list.add(FilteredNotificationItem.fromJson(jsonArray.getJSONObject(i)))
+            }
+        } catch (_: Exception) {}
+        return list
+    }
+
+    fun getFilteredNotifications(): List<FilteredNotificationItem> {
+        return _filteredNotificationsFlow.value
+    }
+
+    @Synchronized
+    fun addFilteredNotification(item: FilteredNotificationItem) {
+        val current = _filteredNotificationsFlow.value.toMutableList()
+        current.removeAll { it.key == item.key }
+        current.add(0, item)
+        val capped = if (current.size > 100) current.take(100) else current
+
+        val jsonArray = JSONArray()
+        for (entry in capped) {
+            jsonArray.put(entry.toJson())
+        }
+        prefs.edit().putString(KEY_NOTIFICATIONS_JSON, jsonArray.toString()).apply()
+        _filteredNotificationsFlow.value = capped
+    }
+
+    @Synchronized
+    fun removeFilteredNotification(key: String) {
+        val current = _filteredNotificationsFlow.value.toMutableList()
+        val changed = current.removeAll { it.key == key }
+        if (changed) {
+            val jsonArray = JSONArray()
+            for (entry in current) {
+                jsonArray.put(entry.toJson())
+            }
+            prefs.edit().putString(KEY_NOTIFICATIONS_JSON, jsonArray.toString()).apply()
+            _filteredNotificationsFlow.value = current
+        }
+    }
+
+    @Synchronized
+    fun clearFilteredNotifications() {
+        prefs.edit().putString(KEY_NOTIFICATIONS_JSON, "[]").apply()
+        _filteredNotificationsFlow.value = emptyList()
+    }
+
     fun getFilteredNotificationsJson(): String {
         return prefs.getString(KEY_NOTIFICATIONS_JSON, "[]") ?: "[]"
     }
 
     fun setFilteredNotificationsJson(json: String) {
         prefs.edit().putString(KEY_NOTIFICATIONS_JSON, json).apply()
+        _filteredNotificationsFlow.value = loadFilteredNotifications()
+    }
+
+    // --- Battery Optimization Prompt Tracking ---
+    fun hasSeenBatteryOptimizationPrompt(): Boolean {
+        return prefs.getBoolean(KEY_BATTERY_PROMPT_SEEN, false)
+    }
+
+    fun setHasSeenBatteryOptimizationPrompt(seen: Boolean) {
+        prefs.edit().putBoolean(KEY_BATTERY_PROMPT_SEEN, seen).apply()
     }
 
     // --- Theme & Appearance ---
@@ -200,6 +280,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_THEME_MODE = "pref_theme_mode"
         private const val KEY_INTRO_COMPLETED = "pref_intro_completed"
         private const val KEY_ONBOARDING_COMPLETED = "pref_onboarding_completed"
+        private const val KEY_BATTERY_PROMPT_SEEN = "pref_battery_prompt_seen"
 
         @Volatile
         private var instance: PreferencesManager? = null

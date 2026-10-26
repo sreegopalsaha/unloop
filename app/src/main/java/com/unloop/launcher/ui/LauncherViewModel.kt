@@ -11,6 +11,8 @@ import androidx.lifecycle.viewModelScope
 import com.unloop.launcher.data.AppItem
 import com.unloop.launcher.data.AppsRepository
 import com.unloop.launcher.data.PreferencesManager
+import com.unloop.launcher.service.FilteredNotificationItem
+import com.unloop.launcher.service.NotificationManagerService
 import com.unloop.launcher.util.AppSearchEngine
 import com.unloop.launcher.util.PermissionUtils
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -85,6 +87,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val _isNotificationPermissionGranted = MutableStateFlow(PermissionUtils.isNotificationListenerEnabled(application))
     val isNotificationPermissionGranted: StateFlow<Boolean> = _isNotificationPermissionGranted.asStateFlow()
 
+    private val _isBatteryOptimizationIgnored = MutableStateFlow(PermissionUtils.isBatteryOptimizationIgnored(application))
+    val isBatteryOptimizationIgnored: StateFlow<Boolean> = _isBatteryOptimizationIgnored.asStateFlow()
+
+    private val _shouldShowBatteryOptimizationDialog = MutableStateFlow(false)
+    val shouldShowBatteryOptimizationDialog: StateFlow<Boolean> = _shouldShowBatteryOptimizationDialog.asStateFlow()
+
+    val filteredNotifications: StateFlow<List<FilteredNotificationItem>> = prefs.filteredNotificationsFlow
+
     private var pendingEnableShortVideoBlocker = false
     private var pendingEnableNotificationManager = false
 
@@ -134,11 +144,19 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         enabled: Boolean,
         onShowRationaleDialog: () -> Unit
     ) {
+        val context = getApplication<Application>()
         if (enabled) {
-            val granted = PermissionUtils.isNotificationListenerEnabled(getApplication())
+            val granted = PermissionUtils.isNotificationListenerEnabled(context)
             _isNotificationPermissionGranted.value = granted
             if (granted) {
                 prefs.setNotificationManagerEnabled(true)
+                NotificationManagerService.requestRebindIfNecessary(context)
+                NotificationManagerService.filterActiveNotificationsIfEnabled()
+                val batteryIgnored = PermissionUtils.isBatteryOptimizationIgnored(context)
+                _isBatteryOptimizationIgnored.value = batteryIgnored
+                if (!batteryIgnored && !prefs.hasSeenBatteryOptimizationPrompt()) {
+                    _shouldShowBatteryOptimizationDialog.value = true
+                }
             } else {
                 pendingEnableNotificationManager = true
                 onShowRationaleDialog()
@@ -146,6 +164,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         } else {
             pendingEnableNotificationManager = false
             prefs.setNotificationManagerEnabled(false)
+            _shouldShowBatteryOptimizationDialog.value = false
         }
     }
 
@@ -158,9 +177,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         val context = getApplication<Application>()
         val accessibilityGranted = PermissionUtils.isAccessibilityServiceEnabled(context)
         val notificationGranted = PermissionUtils.isNotificationListenerEnabled(context)
+        val batteryIgnored = PermissionUtils.isBatteryOptimizationIgnored(context)
 
         _isAccessibilityPermissionGranted.value = accessibilityGranted
         _isNotificationPermissionGranted.value = notificationGranted
+        _isBatteryOptimizationIgnored.value = batteryIgnored
 
         // If permission was revoked outside the app, sync preference
         if (!accessibilityGranted && prefs.isShortVideoBlockerEnabled()) {
@@ -181,6 +202,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         if (pendingEnableNotificationManager) {
             if (notificationGranted) {
                 prefs.setNotificationManagerEnabled(true)
+                NotificationManagerService.requestRebindIfNecessary(context)
+                NotificationManagerService.filterActiveNotificationsIfEnabled()
+                if (!batteryIgnored && !prefs.hasSeenBatteryOptimizationPrompt()) {
+                    _shouldShowBatteryOptimizationDialog.value = true
+                }
             }
             pendingEnableNotificationManager = false
         }
@@ -194,20 +220,35 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         PermissionUtils.openNotificationListenerSettings(context)
     }
 
-    fun getFilteredNotifications(): List<com.unloop.launcher.service.FilteredNotificationItem> {
-        val jsonStr = prefs.getFilteredNotificationsJson()
-        val list = mutableListOf<com.unloop.launcher.service.FilteredNotificationItem>()
-        try {
-            val jsonArray = org.json.JSONArray(jsonStr)
-            for (i in 0 until jsonArray.length()) {
-                list.add(com.unloop.launcher.service.FilteredNotificationItem.fromJson(jsonArray.getJSONObject(i)))
-            }
-        } catch (_: Exception) {}
-        return list
+    fun requestIgnoreBatteryOptimization(context: Context) {
+        PermissionUtils.requestIgnoreBatteryOptimization(context)
+    }
+
+    fun dismissBatteryOptimizationDialog() {
+        prefs.setHasSeenBatteryOptimizationPrompt(true)
+        _shouldShowBatteryOptimizationDialog.value = false
+    }
+
+    fun confirmBatteryOptimization(context: Context) {
+        prefs.setHasSeenBatteryOptimizationPrompt(true)
+        _shouldShowBatteryOptimizationDialog.value = false
+        PermissionUtils.requestIgnoreBatteryOptimization(context)
+    }
+
+    fun getFilteredNotifications(): List<FilteredNotificationItem> {
+        return prefs.getFilteredNotifications()
     }
 
     fun clearFilteredNotifications() {
-        prefs.setFilteredNotificationsJson("[]")
+        prefs.clearFilteredNotifications()
+    }
+
+    fun dismissFilteredNotification(item: FilteredNotificationItem) {
+        prefs.removeFilteredNotification(item.key)
+    }
+
+    fun launchApp(packageName: String) {
+        repository.launchApp(packageName)
     }
 
     init {

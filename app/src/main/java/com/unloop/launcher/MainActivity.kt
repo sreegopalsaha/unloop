@@ -78,6 +78,9 @@ fun LauncherRoot(
     val focusApps by viewModel.focusApps.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
     val notificationManagerEnabled by viewModel.notificationManagerEnabled.collectAsState()
+    val filteredNotifications by viewModel.filteredNotifications.collectAsState()
+    val isBatteryOptimizationIgnored by viewModel.isBatteryOptimizationIgnored.collectAsState()
+    val shouldShowBatteryOptimizationDialog by viewModel.shouldShowBatteryOptimizationDialog.collectAsState()
 
     Crossfade(targetState = currentScreen, label = "ScreenTransition") { screen ->
         when (screen) {
@@ -168,13 +171,20 @@ fun LauncherRoot(
             LauncherScreen.NOTIFICATIONS -> {
                 NotificationsScreen(
                     notificationsEnabled = notificationManagerEnabled,
-                    notifications = viewModel.getFilteredNotifications(),
+                    notifications = filteredNotifications,
+                    isBatteryOptimizationIgnored = isBatteryOptimizationIgnored,
+                    showBatteryOptimizationDialog = shouldShowBatteryOptimizationDialog,
                     onToggleNotifications = { enabled, onShowRationale ->
                         viewModel.requestToggleNotificationManager(enabled, onShowRationale)
                     },
                     onOpenNotificationSettings = { viewModel.openNotificationListenerSettings(activity) },
+                    onRequestBatteryOptimization = { viewModel.requestIgnoreBatteryOptimization(activity) },
+                    onDismissBatteryOptimizationDialog = { viewModel.dismissBatteryOptimizationDialog() },
+                    onConfirmBatteryOptimizationDialog = { viewModel.confirmBatteryOptimization(activity) },
                     onCancelPendingPermission = { viewModel.cancelPendingPermissions() },
                     onClearAll = { viewModel.clearFilteredNotifications() },
+                    onDismissNotification = { viewModel.dismissFilteredNotification(it) },
+                    onNotificationClick = { viewModel.launchApp(it.packageName) },
                     onBack = { viewModel.backFromNotifications() }
                 )
             }
