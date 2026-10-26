@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.unloop.launcher.ui.LauncherScreen
 import com.unloop.launcher.ui.LauncherViewModel
+import com.unloop.launcher.ui.screens.AboutScreen
 import com.unloop.launcher.ui.screens.AllAppsScreen
 import com.unloop.launcher.ui.screens.AppMenuDialog
 import com.unloop.launcher.ui.screens.FocusSettingsScreen
@@ -143,6 +144,7 @@ fun LauncherRoot(
                     onOpenNotifications = { viewModel.openNotifications(LauncherScreen.SETTINGS) },
                     onOpenScreenTime = { viewModel.openSystemDigitalWellbeing(activity) },
                     onChangeTheme = { viewModel.setThemeMode(it) },
+                    onOpenAbout = { viewModel.navigateTo(LauncherScreen.ABOUT) },
                     onBackToHome = { viewModel.navigateTo(LauncherScreen.HOME) }
                 )
             }
@@ -186,6 +188,12 @@ fun LauncherRoot(
                     onDismissNotification = { viewModel.dismissFilteredNotification(it) },
                     onNotificationClick = { viewModel.launchApp(it.packageName) },
                     onBack = { viewModel.backFromNotifications() }
+                )
+            }
+
+            LauncherScreen.ABOUT -> {
+                AboutScreen(
+                    onBack = { viewModel.navigateTo(LauncherScreen.SETTINGS) }
                 )
             }
         }

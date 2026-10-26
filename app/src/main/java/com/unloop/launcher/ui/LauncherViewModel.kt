@@ -30,7 +30,8 @@ enum class LauncherScreen {
     SETTINGS,
     FOCUS_SETTINGS,
     HIDDEN_APPS,
-    NOTIFICATIONS
+    NOTIFICATIONS,
+    ABOUT
 }
 
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {

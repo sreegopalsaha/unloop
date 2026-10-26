@@ -32,10 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.unloop.launcher.ui.components.PermissionRationaleDialog
+import com.unloop.launcher.util.AppVersionUtils
 
 @Composable
 fun SettingsScreen(
@@ -56,9 +58,13 @@ fun SettingsScreen(
     onOpenNotifications: () -> Unit,
     onOpenScreenTime: () -> Unit,
     onChangeTheme: (String) -> Unit,
+    onOpenAbout: () -> Unit = {},
     onBackToHome: () -> Unit
 ) {
     BackHandler(onBack = onBackToHome)
+
+    val context = LocalContext.current
+    val appVersion = remember(context) { AppVersionUtils.getAppVersion(context) }
 
     var showAccessibilityDialog by remember { mutableStateOf(false) }
     var showNotificationDialog by remember { mutableStateOf(false) }
@@ -297,8 +303,8 @@ fun SettingsScreen(
 
             SettingItem(
                 title = "About Unloop",
-                subtitle = "Version 1.0",
-                onClick = {}
+                subtitle = "Version $appVersion",
+                onClick = onOpenAbout
             )
         }
     }
