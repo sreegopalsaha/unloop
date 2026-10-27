@@ -2,6 +2,7 @@ package com.unloop.launcher.service
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
@@ -26,10 +27,25 @@ class ShortVideoBlockerAccessibilityService : AccessibilityService() {
 
         var isServiceConnected: Boolean = false
             private set
+
+        private var instance: ShortVideoBlockerAccessibilityService? = null
+
+        /**
+         * Locks the device using Android's accessibility global action.
+         * Returns true if the action was successfully dispatched.
+         */
+        fun lockScreen(): Boolean {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) ?: false
+            } else {
+                false
+            }
+        }
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = this
         prefs = PreferencesManager.getInstance(this)
         isServiceConnected = true
     }
@@ -114,8 +130,19 @@ class ShortVideoBlockerAccessibilityService : AccessibilityService() {
         // Accessibility service interrupted by system
     }
 
+    override fun onUnbind(intent: Intent?): Boolean {
+        if (instance == this) {
+            instance = null
+        }
+        isServiceConnected = false
+        return super.onUnbind(intent)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        if (instance == this) {
+            instance = null
+        }
         isServiceConnected = false
     }
 }

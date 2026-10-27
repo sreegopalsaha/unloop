@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.unloop.launcher.data.AppItem
+import com.unloop.launcher.ui.components.onDoubleTap
 import com.unloop.launcher.ui.components.onSwipeUp
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -56,7 +57,8 @@ fun HomeScreen(
     onOpenCamera: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAllApps: () -> Unit,
-    onRequestSetDefault: () -> Unit
+    onRequestSetDefault: () -> Unit,
+    onDoubleTap: () -> Unit = {}
 ) {
     var currentTime by remember { mutableStateOf(getCurrentTimeString()) }
     var currentDate by remember { mutableStateOf(getCurrentDateString()) }
@@ -75,6 +77,7 @@ fun HomeScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .onSwipeUp { onOpenAllApps() }
+            .onDoubleTap { onDoubleTap() }
             .padding(horizontal = 24.dp)
     ) {
         Column(

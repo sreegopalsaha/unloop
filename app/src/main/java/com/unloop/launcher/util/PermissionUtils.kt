@@ -218,4 +218,57 @@ object PermissionUtils {
             context.startActivity(generalIntent)
         } catch (_: Exception) {}
     }
+
+    /**
+     * Checks whether double-tap-to-lock (or double-tap-to-sleep) is enabled in device system settings.
+     * Evaluates OEM-specific setting keys across manufacturers (Samsung, OnePlus/Oppo, Xiaomi, Asus, LG, LineageOS/custom ROMs).
+     * If no OEM setting key is found on the device, returns true by default so the feature remains functional.
+     */
+    fun isDoubleTapToLockSettingEnabled(
+        systemSettingsGetter: (String) -> Int?,
+        secureSettingsGetter: (String) -> Int? = { null }
+    ): Boolean {
+        val keys = listOf(
+            "double_tap_to_sleep",
+            "double_tap_to_lock",
+            "double_tap_sleep_gesture",
+            "gesture_double_tap_to_sleep",
+            "double_tap_sleep"
+        )
+        for (key in keys) {
+            val systemVal = systemSettingsGetter(key)
+            if (systemVal != null && systemVal != -1) {
+                return systemVal == 1
+            }
+            val secureVal = secureSettingsGetter(key)
+            if (secureVal != null && secureVal != -1) {
+                return secureVal == 1
+            }
+        }
+        return true
+    }
+
+    /**
+     * Queries the Android ContentResolver for system/secure settings related to double-tap to lock/sleep.
+     */
+    fun isDoubleTapToLockEnabledInSystem(context: Context): Boolean {
+        return isDoubleTapToLockSettingEnabled(
+            systemSettingsGetter = { key ->
+                try {
+                    val value = Settings.System.getInt(context.contentResolver, key, -1)
+                    if (value != -1) value else null
+                } catch (_: Exception) {
+                    null
+                }
+            },
+            secureSettingsGetter = { key ->
+                try {
+                    val value = Settings.Secure.getInt(context.contentResolver, key, -1)
+                    if (value != -1) value else null
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        )
+    }
 }

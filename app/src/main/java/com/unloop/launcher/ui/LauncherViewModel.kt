@@ -1,11 +1,13 @@
 package com.unloop.launcher.ui
 
 import android.app.Application
+import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.unloop.launcher.data.AppItem
@@ -13,6 +15,7 @@ import com.unloop.launcher.data.AppsRepository
 import com.unloop.launcher.data.PreferencesManager
 import com.unloop.launcher.service.FilteredNotificationItem
 import com.unloop.launcher.service.NotificationManagerService
+import com.unloop.launcher.service.ShortVideoBlockerAccessibilityService
 import com.unloop.launcher.util.AppSearchEngine
 import com.unloop.launcher.util.PermissionUtils
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -257,6 +260,44 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         prefs.setHasSeenBatteryOptimizationPrompt(true)
         _shouldShowBatteryOptimizationDialog.value = false
         PermissionUtils.requestIgnoreBatteryOptimization(context)
+    }
+
+    /**
+     * Locks the device on double-tap gesture.
+     * Verifies system settings (respects OEM double tap to sleep/lock configurations)
+     * and uses the AccessibilityService GLOBAL_ACTION_LOCK_SCREEN to lock the screen.
+     */
+    fun lockDevice(context: Context) {
+        if (!PermissionUtils.isDoubleTapToLockEnabledInSystem(context)) {
+            return
+        }
+
+        if (ShortVideoBlockerAccessibilityService.lockScreen()) {
+            return
+        }
+
+        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
+        try {
+            if (dpm != null) {
+                dpm.lockNow()
+                return
+            }
+        } catch (_: Exception) {}
+
+        if (PermissionUtils.isAccessibilityServiceEnabled(context)) {
+            Toast.makeText(
+                context,
+                "Connecting to accessibility service, please try again",
+                Toast.LENGTH_SHORT
+            ).show()
+        } else {
+            Toast.makeText(
+                context,
+                "Enable Unloop in Accessibility settings to allow locking the screen",
+                Toast.LENGTH_SHORT
+            ).show()
+            PermissionUtils.openAccessibilitySettings(context)
+        }
     }
 
     fun getFilteredNotifications(): List<FilteredNotificationItem> {

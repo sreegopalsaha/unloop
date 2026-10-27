@@ -110,7 +110,8 @@ fun LauncherRoot(
                     onOpenCamera = { viewModel.openCamera() },
                     onOpenSettings = { viewModel.navigateTo(LauncherScreen.SETTINGS) },
                     onOpenAllApps = { viewModel.navigateTo(LauncherScreen.ALL_APPS) },
-                    onRequestSetDefault = { viewModel.openSetDefaultLauncher(activity) }
+                    onRequestSetDefault = { viewModel.openSetDefaultLauncher(activity) },
+                    onDoubleTap = { viewModel.lockDevice(activity) }
                 )
             }
 
