@@ -1,5 +1,6 @@
 package com.unloop.launcher.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -60,6 +61,8 @@ fun HomeScreen(
     onRequestSetDefault: () -> Unit,
     onDoubleTap: () -> Unit = {}
 ) {
+    BackHandler {}
+
     var currentTime by remember { mutableStateOf(getCurrentTimeString()) }
     var currentDate by remember { mutableStateOf(getCurrentDateString()) }
 
