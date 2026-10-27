@@ -30,6 +30,9 @@ class PreferencesManager(context: Context) {
     private val _themeModeFlow = MutableStateFlow(getThemeMode())
     val themeModeFlow: StateFlow<String> = _themeModeFlow.asStateFlow()
 
+    private val _showSystemAppsCleanupFlow = MutableStateFlow(isShowSystemAppsCleanup())
+    val showSystemAppsCleanupFlow: StateFlow<Boolean> = _showSystemAppsCleanupFlow.asStateFlow()
+
     private val _notificationManagerFlow = MutableStateFlow(isNotificationManagerEnabled())
     val notificationManagerFlow: StateFlow<Boolean> = _notificationManagerFlow.asStateFlow()
 
@@ -266,6 +269,24 @@ class PreferencesManager(context: Context) {
         prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, completed).apply()
     }
 
+    fun hasDismissedUsageAccessPrompt(): Boolean {
+        return prefs.getBoolean(KEY_USAGE_ACCESS_DISMISSED, false)
+    }
+
+    fun setHasDismissedUsageAccessPrompt(dismissed: Boolean) {
+        prefs.edit().putBoolean(KEY_USAGE_ACCESS_DISMISSED, dismissed).apply()
+    }
+
+    // --- App Cleanup Preferences ---
+    fun isShowSystemAppsCleanup(): Boolean {
+        return prefs.getBoolean(KEY_SHOW_SYSTEM_APPS_CLEANUP, false)
+    }
+
+    fun setShowSystemAppsCleanup(show: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_SYSTEM_APPS_CLEANUP, show).apply()
+        _showSystemAppsCleanupFlow.value = show
+    }
+
     companion object {
         private const val PREFS_NAME = "unloop_launcher_prefs"
         private const val KEY_FAVORITES = "pref_favorites"
@@ -278,9 +299,11 @@ class PreferencesManager(context: Context) {
         private const val KEY_NOTIFICATION_APPS = "pref_notification_apps"
         private const val KEY_NOTIFICATIONS_JSON = "pref_notifications_json"
         private const val KEY_THEME_MODE = "pref_theme_mode"
+        private const val KEY_SHOW_SYSTEM_APPS_CLEANUP = "pref_show_system_apps_cleanup"
         private const val KEY_INTRO_COMPLETED = "pref_intro_completed"
         private const val KEY_ONBOARDING_COMPLETED = "pref_onboarding_completed"
         private const val KEY_BATTERY_PROMPT_SEEN = "pref_battery_prompt_seen"
+        private const val KEY_USAGE_ACCESS_DISMISSED = "pref_usage_access_dismissed"
 
         @Volatile
         private var instance: PreferencesManager? = null

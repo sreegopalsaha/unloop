@@ -55,6 +55,7 @@ fun SettingsScreen(
     onCancelPendingPermission: () -> Unit,
     onOpenFocusSettings: () -> Unit,
     onOpenHiddenApps: () -> Unit,
+    onOpenAppCleanup: () -> Unit = {},
     onOpenNotifications: () -> Unit,
     onOpenScreenTime: () -> Unit,
     onChangeTheme: (String) -> Unit,
@@ -142,6 +143,14 @@ fun SettingsScreen(
                 title = "Hidden apps",
                 subtitle = "Manage and open hidden apps",
                 onClick = onOpenHiddenApps
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+            SettingItem(
+                title = "App cleanup",
+                subtitle = "Categorize apps and clean up unused apps",
+                onClick = onOpenAppCleanup
             )
 
             Spacer(modifier = Modifier.height(32.dp))

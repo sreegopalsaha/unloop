@@ -2,6 +2,7 @@ package com.unloop.launcher.data
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.provider.CallLog
@@ -50,6 +51,14 @@ class AppsRepository(
                     } catch (e: Exception) {
                         pkg
                     }
+                    val appInfo = resolveInfo.activityInfo.applicationInfo
+                    val category = appInfo?.category ?: ApplicationInfo.CATEGORY_UNDEFINED
+                    val isSystem = if (appInfo != null) {
+                        (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 ||
+                        (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                    } else {
+                        false
+                    }
                     installedPackages.add(pkg)
 
                     AppItem(
@@ -58,7 +67,9 @@ class AppsRepository(
                         label = if (label.isBlank()) pkg else label,
                         isFavorite = favorites.contains(pkg),
                         isHidden = hidden.contains(pkg),
-                        isFocusRestricted = focusApps.contains(pkg)
+                        isFocusRestricted = focusApps.contains(pkg),
+                        category = category,
+                        isSystemApp = isSystem
                     )
                 }
                 .distinctBy { it.packageName }

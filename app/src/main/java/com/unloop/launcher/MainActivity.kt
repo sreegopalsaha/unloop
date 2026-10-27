@@ -17,6 +17,7 @@ import com.unloop.launcher.ui.LauncherScreen
 import com.unloop.launcher.ui.LauncherViewModel
 import com.unloop.launcher.ui.screens.AboutScreen
 import com.unloop.launcher.ui.screens.AllAppsScreen
+import com.unloop.launcher.ui.screens.AppCleanupScreen
 import com.unloop.launcher.ui.screens.AppMenuDialog
 import com.unloop.launcher.ui.screens.FocusSettingsScreen
 import com.unloop.launcher.ui.screens.HiddenAppsScreen
@@ -82,6 +83,9 @@ fun LauncherRoot(
     val filteredNotifications by viewModel.filteredNotifications.collectAsState()
     val isBatteryOptimizationIgnored by viewModel.isBatteryOptimizationIgnored.collectAsState()
     val shouldShowBatteryOptimizationDialog by viewModel.shouldShowBatteryOptimizationDialog.collectAsState()
+    val isUsageAccessGranted by viewModel.isUsageAccessGranted.collectAsState()
+    val isUsageBannerDismissed by viewModel.isUsageBannerDismissed.collectAsState()
+    val showSystemAppsCleanup by viewModel.showSystemAppsCleanup.collectAsState()
 
     Crossfade(targetState = currentScreen, label = "ScreenTransition") { screen ->
         when (screen) {
@@ -141,6 +145,7 @@ fun LauncherRoot(
                     onCancelPendingPermission = { viewModel.cancelPendingPermissions() },
                     onOpenFocusSettings = { viewModel.navigateTo(LauncherScreen.FOCUS_SETTINGS) },
                     onOpenHiddenApps = { viewModel.navigateTo(LauncherScreen.HIDDEN_APPS) },
+                    onOpenAppCleanup = { viewModel.navigateTo(LauncherScreen.APP_CLEANUP) },
                     onOpenNotifications = { viewModel.openNotifications(LauncherScreen.SETTINGS) },
                     onOpenScreenTime = { viewModel.openSystemDigitalWellbeing(activity) },
                     onChangeTheme = { viewModel.setThemeMode(it) },
@@ -193,6 +198,21 @@ fun LauncherRoot(
 
             LauncherScreen.ABOUT -> {
                 AboutScreen(
+                    onBack = { viewModel.navigateTo(LauncherScreen.SETTINGS) }
+                )
+            }
+
+            LauncherScreen.APP_CLEANUP -> {
+                AppCleanupScreen(
+                    installedApps = allInstalledApps,
+                    isUsageAccessGranted = isUsageAccessGranted,
+                    isUsageBannerDismissed = isUsageBannerDismissed,
+                    showSystemApps = showSystemAppsCleanup,
+                    onToggleShowSystemApps = { viewModel.setShowSystemAppsCleanup(it) },
+                    onOpenUsageSettings = { viewModel.openUsageAccessSettings(activity) },
+                    onDismissUsageBanner = { viewModel.dismissUsageBanner() },
+                    onUninstallApp = { viewModel.openAppDetails(it) },
+                    onOpenApp = { viewModel.handleAppClick(it) },
                     onBack = { viewModel.navigateTo(LauncherScreen.SETTINGS) }
                 )
             }

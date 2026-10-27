@@ -31,7 +31,8 @@ enum class LauncherScreen {
     FOCUS_SETTINGS,
     HIDDEN_APPS,
     NOTIFICATIONS,
-    ABOUT
+    ABOUT,
+    APP_CLEANUP
 }
 
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
@@ -91,6 +92,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val _isBatteryOptimizationIgnored = MutableStateFlow(PermissionUtils.isBatteryOptimizationIgnored(application))
     val isBatteryOptimizationIgnored: StateFlow<Boolean> = _isBatteryOptimizationIgnored.asStateFlow()
 
+    private val _isUsageAccessGranted = MutableStateFlow(PermissionUtils.hasUsageAccessPermission(application))
+    val isUsageAccessGranted: StateFlow<Boolean> = _isUsageAccessGranted.asStateFlow()
+
+    private val _isUsageBannerDismissed = MutableStateFlow(prefs.hasDismissedUsageAccessPrompt())
+    val isUsageBannerDismissed: StateFlow<Boolean> = _isUsageBannerDismissed.asStateFlow()
+
+    fun dismissUsageBanner() {
+        prefs.setHasDismissedUsageAccessPrompt(true)
+        _isUsageBannerDismissed.value = true
+    }
+
     private val _shouldShowBatteryOptimizationDialog = MutableStateFlow(false)
     val shouldShowBatteryOptimizationDialog: StateFlow<Boolean> = _shouldShowBatteryOptimizationDialog.asStateFlow()
 
@@ -110,6 +122,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val focusModeEnabled: StateFlow<Boolean> = prefs.focusModeFlow
     val focusApps: StateFlow<Set<String>> = prefs.focusAppsFlow
     val themeMode: StateFlow<String> = prefs.themeModeFlow
+    val showSystemAppsCleanup: StateFlow<Boolean> = prefs.showSystemAppsCleanupFlow
+
+    fun setShowSystemAppsCleanup(show: Boolean) {
+        prefs.setShowSystemAppsCleanup(show)
+    }
 
     val notificationManagerEnabled: StateFlow<Boolean> = combine(
         prefs.notificationManagerFlow,
@@ -179,10 +196,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         val accessibilityGranted = PermissionUtils.isAccessibilityServiceEnabled(context)
         val notificationGranted = PermissionUtils.isNotificationListenerEnabled(context)
         val batteryIgnored = PermissionUtils.isBatteryOptimizationIgnored(context)
+        val usageGranted = PermissionUtils.hasUsageAccessPermission(context)
 
         _isAccessibilityPermissionGranted.value = accessibilityGranted
         _isNotificationPermissionGranted.value = notificationGranted
         _isBatteryOptimizationIgnored.value = batteryIgnored
+        _isUsageAccessGranted.value = usageGranted
 
         // If permission was revoked outside the app, sync preference
         if (!accessibilityGranted && prefs.isShortVideoBlockerEnabled()) {
@@ -219,6 +238,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun openNotificationListenerSettings(context: Context) {
         PermissionUtils.openNotificationListenerSettings(context)
+    }
+
+    fun openUsageAccessSettings(context: Context) {
+        PermissionUtils.openUsageAccessSettings(context)
     }
 
     fun requestIgnoreBatteryOptimization(context: Context) {
