@@ -2,6 +2,7 @@ package com.unloop.launcher
 
 import android.app.Notification
 import com.unloop.launcher.service.FilteredNotificationItem
+import com.unloop.launcher.service.NotificationManagerService
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -164,20 +165,18 @@ class NotificationManagementTest {
             isOngoing: Boolean,
             isClearable: Boolean,
             flags: Int,
-            category: String?
+            category: String?,
+            isPhoneApp: Boolean = NotificationManagerService.isPhonePackage(pkg)
         ): Boolean {
-            if (pkg == unloopPackage) return false
-            if (isOngoing || !isClearable) return false
-            if ((flags and Notification.FLAG_ONGOING_EVENT) != 0) return false
-            if ((flags and Notification.FLAG_NO_CLEAR) != 0) return false
-            if ((flags and Notification.FLAG_FOREGROUND_SERVICE) != 0) return false
-
-            when (category) {
-                Notification.CATEGORY_CALL,
-                Notification.CATEGORY_ALARM,
-                Notification.CATEGORY_STOPWATCH -> return false
-            }
-            return true
+            return NotificationManagerService.shouldFilterNotification(
+                packageName = pkg,
+                isOngoing = isOngoing,
+                isClearable = isClearable,
+                flags = flags,
+                category = category,
+                currentPackageName = unloopPackage,
+                isPhoneApp = isPhoneApp
+            )
         }
 
         // Regular clearable chat notification -> should filter
@@ -243,6 +242,71 @@ class NotificationManagementTest {
                 isClearable = true,
                 flags = 0,
                 category = Notification.CATEGORY_CALL
+            )
+        )
+
+        // Missed call with CATEGORY_MISSED_CALL -> never filter
+        assertFalse(
+            shouldFilterNotification(
+                pkg = "com.google.android.dialer",
+                isOngoing = false,
+                isClearable = true,
+                flags = 0,
+                category = Notification.CATEGORY_MISSED_CALL
+            )
+        )
+
+        // Missed call without category from system Phone app -> never filter
+        assertFalse(
+            shouldFilterNotification(
+                pkg = "com.google.android.dialer",
+                isOngoing = false,
+                isClearable = true,
+                flags = 0,
+                category = null
+            )
+        )
+
+        // Call-related alert (e.g. voicemail) from system Phone app -> never filter
+        assertFalse(
+            shouldFilterNotification(
+                pkg = "com.google.android.dialer",
+                isOngoing = false,
+                isClearable = true,
+                flags = 0,
+                category = "voicemail"
+            )
+        )
+
+        // Notifications from other system phone packages (com.android.phone, com.android.dialer) -> never filter
+        assertFalse(
+            shouldFilterNotification(
+                pkg = "com.android.phone",
+                isOngoing = false,
+                isClearable = true,
+                flags = 0,
+                category = null
+            )
+        )
+        assertFalse(
+            shouldFilterNotification(
+                pkg = "com.android.dialer",
+                isOngoing = false,
+                isClearable = true,
+                flags = 0,
+                category = null
+            )
+        )
+
+        // Dynamically identified default dialer -> never filter
+        assertFalse(
+            shouldFilterNotification(
+                pkg = "com.custom.dialer",
+                isOngoing = false,
+                isClearable = true,
+                flags = 0,
+                category = null,
+                isPhoneApp = true
             )
         )
 

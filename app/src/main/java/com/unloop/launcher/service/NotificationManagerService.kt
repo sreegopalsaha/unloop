@@ -3,8 +3,11 @@ package com.unloop.launcher.service
 import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.telecom.TelecomManager
 import com.unloop.launcher.data.PreferencesManager
 import com.unloop.launcher.util.PermissionUtils
 
@@ -70,33 +73,48 @@ class NotificationManagerService : NotificationListenerService() {
         } catch (_: Exception) {}
     }
 
+    private fun isPhoneApp(pkg: String): Boolean {
+        if (isPhonePackage(pkg)) {
+            return true
+        }
+
+        // Dynamically check system default dialer package
+        try {
+            val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+            val defaultDialer = telecomManager?.defaultDialerPackage
+            if (!defaultDialer.isNullOrBlank() && pkg == defaultDialer) {
+                return true
+            }
+        } catch (_: Exception) {}
+
+        // Dynamically check package handling ACTION_DIAL
+        try {
+            val dialIntent = Intent(Intent.ACTION_DIAL)
+            val resolveInfo = packageManager.resolveActivity(dialIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            val dialerPkg = resolveInfo?.activityInfo?.packageName
+            if (!dialerPkg.isNullOrBlank() && dialerPkg != "android" && dialerPkg != packageName && pkg == dialerPkg) {
+                return true
+            }
+        } catch (_: Exception) {}
+
+        return false
+    }
+
     private fun processAndFilterNotification(sbn: StatusBarNotification) {
         val pkg = sbn.packageName ?: return
-
-        // 1. Do not intercept Unloop's own notifications
-        if (pkg == packageName) {
-            return
-        }
-
-        // 2. Do not intercept non-clearable, ongoing, or foreground tasks
-        if (sbn.isOngoing || !sbn.isClearable) {
-            return
-        }
-
         val notification = sbn.notification ?: return
-        val flags = notification.flags
-        if ((flags and Notification.FLAG_ONGOING_EVENT) != 0 ||
-            (flags and Notification.FLAG_NO_CLEAR) != 0 ||
-            (flags and Notification.FLAG_FOREGROUND_SERVICE) != 0
+
+        if (!shouldFilterNotification(
+                packageName = pkg,
+                isOngoing = sbn.isOngoing,
+                isClearable = sbn.isClearable,
+                flags = notification.flags,
+                category = notification.category,
+                currentPackageName = packageName,
+                isPhoneApp = isPhoneApp(pkg)
+            )
         ) {
             return
-        }
-
-        // 3. Preserve critical system alerts, phone calls, and alarms
-        when (notification.category) {
-            Notification.CATEGORY_CALL,
-            Notification.CATEGORY_ALARM,
-            Notification.CATEGORY_STOPWATCH -> return
         }
 
         // 4. Extract notification text details robustly
@@ -166,6 +184,55 @@ class NotificationManagerService : NotificationListenerService() {
 
         val isServiceConnected: Boolean
             get() = instance != null
+
+        val PHONE_PACKAGES = setOf(
+            "com.google.android.dialer",
+            "com.android.dialer",
+            "com.android.phone",
+            "com.samsung.android.dialer",
+            "com.samsung.android.incallui"
+        )
+
+        fun isPhonePackage(packageName: String): Boolean {
+            return PHONE_PACKAGES.contains(packageName)
+        }
+
+        fun shouldFilterNotification(
+            packageName: String,
+            isOngoing: Boolean,
+            isClearable: Boolean,
+            flags: Int,
+            category: String?,
+            currentPackageName: String = "com.unloop.launcher",
+            isPhoneApp: Boolean = isPhonePackage(packageName)
+        ): Boolean {
+            // 1. Do not intercept Unloop's own notifications or system Phone app
+            if (packageName == currentPackageName || isPhoneApp) {
+                return false
+            }
+
+            // 2. Do not intercept non-clearable, ongoing, or foreground tasks
+            if (isOngoing || !isClearable) {
+                return false
+            }
+
+            if ((flags and Notification.FLAG_ONGOING_EVENT) != 0 ||
+                (flags and Notification.FLAG_NO_CLEAR) != 0 ||
+                (flags and Notification.FLAG_FOREGROUND_SERVICE) != 0
+            ) {
+                return false
+            }
+
+            // 3. Preserve critical system alerts, phone calls, and alarms
+            when (category) {
+                Notification.CATEGORY_CALL,
+                Notification.CATEGORY_MISSED_CALL,
+                Notification.CATEGORY_ALARM,
+                Notification.CATEGORY_STOPWATCH -> return false
+            }
+
+            return true
+        }
 
         fun requestRebindIfNecessary(context: Context) {
             if (instance == null && PermissionUtils.isNotificationListenerEnabled(context)) {
