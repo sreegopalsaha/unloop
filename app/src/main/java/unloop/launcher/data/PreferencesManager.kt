@@ -2,6 +2,8 @@ package unloop.launcher.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import unloop.launcher.auth.model.AuthSession
+import unloop.launcher.auth.model.UserProfile
 import unloop.launcher.service.FilteredNotificationItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,6 +41,9 @@ class PreferencesManager(context: Context) {
     private val _filteredNotificationsFlow = MutableStateFlow(loadFilteredNotifications())
     val filteredNotificationsFlow: StateFlow<List<FilteredNotificationItem>> = _filteredNotificationsFlow.asStateFlow()
 
+    private val _authSessionFlow = MutableStateFlow(loadAuthSession())
+    val authSessionFlow: StateFlow<AuthSession?> = _authSessionFlow.asStateFlow()
+
     init {
         prefs.registerOnSharedPreferenceChangeListener { _, key ->
             when (key) {
@@ -51,6 +56,45 @@ class PreferencesManager(context: Context) {
                 }
             }
         }
+    }
+
+    // --- Authentication & Session Management ---
+    private fun loadAuthSession(): AuthSession? {
+        val token = prefs.getString(KEY_AUTH_TOKEN, null) ?: return null
+        val id = prefs.getString(KEY_USER_ID, null) ?: return null
+        val email = prefs.getString(KEY_USER_EMAIL, "") ?: ""
+        val name = prefs.getString(KEY_USER_NAME, "User") ?: "User"
+        val picture = prefs.getString(KEY_USER_PICTURE, null)
+        return AuthSession(
+            token = token,
+            user = UserProfile(id = id, name = name, email = email, picture = picture)
+        )
+    }
+
+    fun getAuthSession(): AuthSession? {
+        return _authSessionFlow.value
+    }
+
+    fun saveAuthSession(session: AuthSession) {
+        prefs.edit()
+            .putString(KEY_AUTH_TOKEN, session.token)
+            .putString(KEY_USER_ID, session.user.id)
+            .putString(KEY_USER_NAME, session.user.name)
+            .putString(KEY_USER_EMAIL, session.user.email)
+            .putString(KEY_USER_PICTURE, session.user.picture)
+            .apply()
+        _authSessionFlow.value = session
+    }
+
+    fun clearAuthSession() {
+        prefs.edit()
+            .remove(KEY_AUTH_TOKEN)
+            .remove(KEY_USER_ID)
+            .remove(KEY_USER_NAME)
+            .remove(KEY_USER_EMAIL)
+            .remove(KEY_USER_PICTURE)
+            .apply()
+        _authSessionFlow.value = null
     }
 
     // --- Favorites ---
@@ -289,6 +333,11 @@ class PreferencesManager(context: Context) {
 
     companion object {
         private const val PREFS_NAME = "unloop_launcher_prefs"
+        private const val KEY_AUTH_TOKEN = "pref_auth_token"
+        private const val KEY_USER_ID = "pref_user_id"
+        private const val KEY_USER_NAME = "pref_user_name"
+        private const val KEY_USER_EMAIL = "pref_user_email"
+        private const val KEY_USER_PICTURE = "pref_user_picture"
         private const val KEY_FAVORITES = "pref_favorites"
         private const val KEY_HIDDEN_APPS = "pref_hidden_apps"
         private const val KEY_SHORT_VIDEO_BLOCKER = "pref_short_video_blocker"
