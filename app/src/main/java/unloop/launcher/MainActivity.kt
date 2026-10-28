@@ -95,6 +95,9 @@ fun LauncherRoot(
                 OnboardingScreen(
                     isDefaultLauncher = isDefaultLauncher,
                     initialPage = viewModel.getInitialOnboardingPage(),
+                    authState = authState,
+                    onContinueWithGoogle = { viewModel.loginWithGoogle(activity) },
+                    onDismissAuthError = { viewModel.dismissAuthError() },
                     onSetDefaultLauncher = { viewModel.openSetDefaultLauncher(activity) },
                     onCompleteOnboarding = { viewModel.completeOnboarding() },
                     onIntroCompleted = { viewModel.markIntroCompleted() }

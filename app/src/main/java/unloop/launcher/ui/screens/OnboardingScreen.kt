@@ -1,8 +1,9 @@
 package unloop.launcher.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -13,7 +14,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -21,8 +25,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,16 +37,25 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import unloop.launcher.R
+import unloop.launcher.auth.model.AuthState
 
 @Composable
 fun OnboardingScreen(
     isDefaultLauncher: Boolean,
     initialPage: Int = 0,
+    authState: AuthState = AuthState.Idle,
+    onContinueWithGoogle: () -> Unit,
+    onDismissAuthError: () -> Unit = {},
     onSetDefaultLauncher: () -> Unit,
     onCompleteOnboarding: () -> Unit,
     onIntroCompleted: () -> Unit
@@ -52,10 +65,18 @@ fun OnboardingScreen(
         initialPage = initialPage.coerceIn(0, pageCount - 1)
     ) { pageCount }
     val coroutineScope = rememberCoroutineScope()
+    val isAuthenticated = authState is AuthState.Authenticated
 
-    // Mark intro completed as soon as user navigates to the default launcher setup screen (page 2)
-    LaunchedEffect(pagerState.currentPage) {
-        if (pagerState.currentPage >= 2) {
+    // Auto-advance to Page 1 (Welcome to Unloop) as soon as user successfully signs in on Page 0
+    LaunchedEffect(isAuthenticated) {
+        if (isAuthenticated && pagerState.currentPage == 0) {
+            pagerState.animateScrollToPage(1)
+        }
+    }
+
+    // Mark intro completed as soon as user navigates to the default launcher setup screen (page 2) with valid auth
+    LaunchedEffect(pagerState.currentPage, isAuthenticated) {
+        if (pagerState.currentPage >= 2 && isAuthenticated) {
             onIntroCompleted()
         }
     }
@@ -64,159 +85,204 @@ fun OnboardingScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 24.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 48.dp, bottom = 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Minimalist Progress Indicators
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                repeat(pageCount) { index ->
-                    val isSelected = pagerState.currentPage == index
-                    val width by animateDpAsState(
-                        targetValue = if (isSelected) 32.dp else 8.dp,
-                        label = "IndicatorWidth"
-                    )
-                    val color by animateColorAsState(
-                        targetValue = if (isSelected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        },
-                        label = "IndicatorColor"
-                    )
+        // Main Pager with 3 screens:
+        // Page 0: Redesigned "Continue with Google" screen with full-bleed background image
+        // Page 1: "Welcome to Unloop" (Explain App)
+        // Page 2: "Set as Default Launcher"
+        HorizontalPager(
+            state = pagerState,
+            userScrollEnabled = pagerState.currentPage != 0 || isAuthenticated,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            when (page) {
+                0 -> OnboardingSignInScreen(
+                    authState = authState,
+                    onContinueWithGoogle = onContinueWithGoogle
+                )
 
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 4.dp)
-                            .height(4.dp)
-                            .width(width)
-                            .clip(CircleShape)
-                            .background(color)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Main Pager with 3 screens
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) { page ->
-                when (page) {
-                    0 -> OnboardingExplainAppScreen()
-                    1 -> OnboardingPrivacyScreen()
-                    2 -> OnboardingDefaultLauncherScreen(
-                        isDefaultLauncher = isDefaultLauncher,
-                        onSetDefaultLauncher = onSetDefaultLauncher
-                    )
-                }
-            }
-
-            // Bottom Actions & Navigation
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (pagerState.currentPage < 2) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(2)
-                                }
-                            }
-                        ) {
-                            Text(
-                                text = "Skip",
-                                color = MaterialTheme.colorScheme.secondary,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.height(48.dp)
-                        ) {
-                            Text(
-                                text = "Next",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium)
-                            )
-                        }
-                    }
-                } else {
-                    // Screen 3: Default launcher actions
-                    if (isDefaultLauncher) {
-                        Button(
-                            onClick = onCompleteOnboarding,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ),
-                            shape = RoundedCornerShape(12.dp),
+                1 -> {
+                    if (isAuthenticated) {
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
+                                .fillMaxSize()
+                                .padding(horizontal = 24.dp)
+                                .padding(top = 80.dp, bottom = 100.dp)
                         ) {
-                            Text(
-                                text = "Get Started",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                            OnboardingExplainAppScreen()
+                        }
+                    } else {
+                        OnboardingSignInScreen(
+                            authState = authState,
+                            onContinueWithGoogle = onContinueWithGoogle
+                        )
+                    }
+                }
+
+                2 -> {
+                    if (isAuthenticated) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 24.dp)
+                                .padding(top = 80.dp, bottom = 120.dp)
+                        ) {
+                            OnboardingDefaultLauncherScreen(
+                                isDefaultLauncher = isDefaultLauncher,
+                                onSetDefaultLauncher = onSetDefaultLauncher
                             )
                         }
                     } else {
-                        Button(
-                            onClick = onSetDefaultLauncher,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
+                        OnboardingSignInScreen(
+                            authState = authState,
+                            onContinueWithGoogle = onContinueWithGoogle
+                        )
+                    }
+                }
+            }
+        }
+
+        // Top Minimalist Progress Indicators
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(vertical = 16.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            repeat(pageCount) { index ->
+                val isSelected = pagerState.currentPage == index
+                val width by animateDpAsState(
+                    targetValue = if (isSelected) 32.dp else 8.dp,
+                    label = "IndicatorWidth"
+                )
+                val color by animateColorAsState(
+                    targetValue = if (isSelected) {
+                        if (pagerState.currentPage == 0) Color.White else MaterialTheme.colorScheme.primary
+                    } else {
+                        if (pagerState.currentPage == 0) Color.White.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    label = "IndicatorColor"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 4.dp)
+                        .height(4.dp)
+                        .width(width)
+                        .clip(CircleShape)
+                        .background(color)
+                )
+            }
+        }
+
+        // Bottom Actions & Navigation (for Pages 1 and 2)
+        if (pagerState.currentPage > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 24.dp)
+            ) {
+                when (pagerState.currentPage) {
+                    1 -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Set as Default Launcher",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                            )
+                            TextButton(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(2)
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    text = "Skip",
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(2)
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.height(48.dp)
+                            ) {
+                                Text(
+                                    text = "Next",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium)
+                                )
+                            }
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                    2 -> {
+                        if (isAuthenticated) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                if (isDefaultLauncher) {
+                                    Button(
+                                        onClick = onCompleteOnboarding,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        ),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(52.dp)
+                                    ) {
+                                        Text(
+                                            text = "Get Started",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                                        )
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = onSetDefaultLauncher,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        ),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(52.dp)
+                                    ) {
+                                        Text(
+                                            text = "Set as Default Launcher",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                                        )
+                                    }
 
-                        TextButton(
-                            onClick = onCompleteOnboarding,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "Continue without setting default",
-                                color = MaterialTheme.colorScheme.secondary,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    TextButton(
+                                        onClick = onCompleteOnboarding,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = "Continue without setting default",
+                                            color = MaterialTheme.colorScheme.secondary,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -226,7 +292,197 @@ fun OnboardingScreen(
 }
 
 /**
- * Screen 1: What Unloop does.
+ * Screen 1 (Position 1): Redesigned "Continue with Google" onboarding screen.
+ */
+@Composable
+private fun OnboardingSignInScreen(
+    authState: AuthState,
+    onContinueWithGoogle: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Full-bleed Background Image
+        Image(
+            painter = painterResource(id = R.drawable.onboarding_bg),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Gradient overlay for contrast and legibility
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.45f),
+                            Color.Black.copy(alpha = 0.2f),
+                            Color.Black.copy(alpha = 0.85f)
+                        )
+                    )
+                )
+        )
+
+        // Screen content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
+                .padding(top = 40.dp, bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Center: ONLY the "Unloop" text is in the center
+            Text(
+                text = "Unloop",
+                style = MaterialTheme.typography.displayMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 40.sp,
+                    letterSpacing = 2.sp
+                ),
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Bottom Section: Headline, Subtitle, Primary Button, and Terms
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Your phone, your control.",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 32.sp,
+                        lineHeight = 38.sp
+                    ),
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "A distraction-free launcher for more intentional living.",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 16.sp,
+                        lineHeight = 22.sp
+                    ),
+                    color = Color.White.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                if (authState is AuthState.Error) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.25f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "Sign-in Failed",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = authState.message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.9f)
+                            )
+                        }
+                    }
+                }
+
+                val isLoading = authState is AuthState.Loading || authState is AuthState.Authenticated
+
+                // Primary Button: "Continue with Google"
+                Surface(
+                    onClick = {
+                        if (!isLoading) onContinueWithGoogle()
+                    },
+                    enabled = !isLoading,
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                strokeWidth = 2.5.dp,
+                                color = Color(0xFF4285F4)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Signing in...",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF1F1F1F)
+                                )
+                            )
+                        } else {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_google_logo),
+                                contentDescription = "Google logo",
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Continue with Google",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF1F1F1F)
+                                )
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Bottom disclaimer
+                Text(
+                    text = "By continuing, you agree to our Terms and Conditions and Privacy Policy.",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    ),
+                    color = Color.White.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Screen 2 (Position 2): Existing first onboarding screen ("Welcome to Unloop").
  */
 @Composable
 private fun OnboardingExplainAppScreen() {
@@ -315,86 +571,7 @@ private fun OnboardingExplainAppScreen() {
 }
 
 /**
- * Screen 2: Key benefit and privacy.
- */
-@Composable
-private fun OnboardingPrivacyScreen() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        // Minimalist Privacy Badge
-        Box(
-            modifier = Modifier
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(20.dp)
-                )
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(20.dp)
-                )
-                .padding(horizontal = 32.dp, vertical = 20.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "OFFLINE & SECURE",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        letterSpacing = 2.sp,
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Zero Data Collection",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(36.dp))
-
-        Text(
-            text = "Your Privacy Comes First",
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontWeight = FontWeight.Light,
-                fontSize = 30.sp
-            ),
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "Everything stays strictly on your device. We do not track, collect, or send any personal data, app usage, or analytics to external servers.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.secondary,
-            textAlign = TextAlign.Center,
-            lineHeight = 24.sp
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "No accounts, no advertisements, and no cloud telemetry. A launcher that genuinely respects your privacy and digital well-being.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f),
-            textAlign = TextAlign.Center,
-            lineHeight = 22.sp
-        )
-    }
-}
-
-/**
- * Screen 3: Default launcher setup guide.
+ * Screen 3 (Position 3): Default launcher setup guide.
  */
 @Composable
 private fun OnboardingDefaultLauncherScreen(
@@ -412,7 +589,7 @@ private fun OnboardingDefaultLauncherScreen(
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
             shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(
+            border = BorderStroke(
                 1.dp,
                 if (isDefaultLauncher) {
                     MaterialTheme.colorScheme.primary

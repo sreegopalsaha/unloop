@@ -10,9 +10,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 
-class PreferencesManager(context: Context) {
+class PreferencesManager internal constructor(private val prefs: SharedPreferences) {
 
-    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    constructor(context: Context) : this(context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
+
+
 
     private val _favoritesFlow = MutableStateFlow(getFavorites())
     val favoritesFlow: StateFlow<Set<String>> = _favoritesFlow.asStateFlow()
@@ -82,6 +84,7 @@ class PreferencesManager(context: Context) {
             .putString(KEY_USER_NAME, session.user.name)
             .putString(KEY_USER_EMAIL, session.user.email)
             .putString(KEY_USER_PICTURE, session.user.picture)
+            .putLong(KEY_LAST_AUTH_VALIDATION, System.currentTimeMillis())
             .apply()
         _authSessionFlow.value = session
     }
@@ -93,8 +96,17 @@ class PreferencesManager(context: Context) {
             .remove(KEY_USER_NAME)
             .remove(KEY_USER_EMAIL)
             .remove(KEY_USER_PICTURE)
+            .remove(KEY_LAST_AUTH_VALIDATION)
             .apply()
         _authSessionFlow.value = null
+    }
+
+    fun getLastAuthValidationTime(): Long {
+        return prefs.getLong(KEY_LAST_AUTH_VALIDATION, 0L)
+    }
+
+    fun setLastAuthValidationTime(timestamp: Long) {
+        prefs.edit().putLong(KEY_LAST_AUTH_VALIDATION, timestamp).apply()
     }
 
     // --- Favorites ---
@@ -338,6 +350,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_USER_NAME = "pref_user_name"
         private const val KEY_USER_EMAIL = "pref_user_email"
         private const val KEY_USER_PICTURE = "pref_user_picture"
+        private const val KEY_LAST_AUTH_VALIDATION = "pref_last_auth_validation"
         private const val KEY_FAVORITES = "pref_favorites"
         private const val KEY_HIDDEN_APPS = "pref_hidden_apps"
         private const val KEY_SHORT_VIDEO_BLOCKER = "pref_short_video_blocker"

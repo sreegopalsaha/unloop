@@ -14,10 +14,10 @@ import java.net.URL
 
 class AuthApiException(message: String, val statusCode: Int = 0) : Exception(message)
 
-class AuthApiClient(
+open class AuthApiClient(
     private val baseUrl: String = BuildConfig.BACKEND_BASE_URL
 ) {
-    suspend fun authenticateWithGoogle(idToken: String): Result<AuthSession> = withContext(Dispatchers.IO) {
+    open suspend fun authenticateWithGoogle(idToken: String): Result<AuthSession> = withContext(Dispatchers.IO) {
         try {
             val endpoint = URL("$baseUrl/api/auth/google")
             val connection = (endpoint.openConnection() as HttpURLConnection).apply {
@@ -73,7 +73,7 @@ class AuthApiClient(
         }
     }
 
-    suspend fun getProfile(token: String): Result<UserProfile> = withContext(Dispatchers.IO) {
+    open suspend fun getProfile(token: String): Result<UserProfile> = withContext(Dispatchers.IO) {
         try {
             val endpoint = URL("$baseUrl/api/users/me")
             val connection = (endpoint.openConnection() as HttpURLConnection).apply {

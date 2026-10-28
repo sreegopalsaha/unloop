@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import unloop.launcher.auth.AuthRepository
+import unloop.launcher.auth.SessionValidationResult
 import unloop.launcher.auth.GoogleAuthCancellationException
 import unloop.launcher.auth.model.AuthSession
 import unloop.launcher.auth.model.AuthState
@@ -50,7 +51,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val authRepository = AuthRepository(prefs)
     val authSession: StateFlow<AuthSession?> = authRepository.authSessionFlow
     private val _authState = MutableStateFlow<AuthState>(
-        prefs.getAuthSession()?.let { AuthState.Authenticated(it) } ?: AuthState.Idle
+        if (authRepository.hasValidSession()) {
+            prefs.getAuthSession()?.let { AuthState.Authenticated(it) } ?: AuthState.Idle
+        } else {
+            AuthState.Idle
+        }
     )
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
@@ -336,12 +341,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             repository.refreshApps()
             checkDefaultStatus()
             checkPermissions()
+            checkSessionValidation()
         }
     }
 
     private var notificationSourceScreen: LauncherScreen = LauncherScreen.HOME
 
     fun navigateTo(screen: LauncherScreen) {
+        if (!authRepository.hasValidSession() && screen != LauncherScreen.ONBOARDING) {
+            _currentScreen.value = LauncherScreen.ONBOARDING
+            return
+        }
         if (screen == LauncherScreen.ALL_APPS && _currentScreen.value != LauncherScreen.ALL_APPS) {
             _searchQuery.value = ""
         }
@@ -440,6 +450,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun determineInitialScreen(): LauncherScreen {
+        if (!authRepository.hasValidSession()) {
+            return LauncherScreen.ONBOARDING
+        }
         val isDefault = checkIfDefaultLauncher()
         val isIntroDone = prefs.isIntroCompleted()
         // If user hasn't seen the intro, or hasn't finished setting default launcher, show onboarding
@@ -453,7 +466,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun getInitialOnboardingPage(): Int {
         // If user already passed the intro explanations (screens 1 & 2) but launcher setup is pending,
         // take them directly to screen 3 (index 2) so they aren't forced to re-read the intro.
-        return if (prefs.isIntroCompleted() && !checkIfDefaultLauncher()) 2 else 0
+        if (!authRepository.hasValidSession()) {
+            return 0
+        }
+        return if (prefs.isIntroCompleted() && !checkIfDefaultLauncher()) 2 else 1
     }
 
     fun markIntroCompleted() {
@@ -461,6 +477,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun completeOnboarding() {
+        if (!authRepository.hasValidSession()) {
+            _currentScreen.value = LauncherScreen.ONBOARDING
+            return
+        }
         prefs.setIntroCompleted(true)
         prefs.setOnboardingCompleted(true)
         _currentScreen.value = LauncherScreen.HOME
@@ -469,7 +489,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun checkDefaultStatus() {
         val isDefault = checkIfDefaultLauncher()
         _isDefaultLauncher.value = isDefault
-        if (isDefault) {
+        if (isDefault && authRepository.hasValidSession()) {
             prefs.setOnboardingCompleted(true)
             // If user was on onboarding and just completed default launcher setup, proceed to Home
             if (_currentScreen.value == LauncherScreen.ONBOARDING) {
@@ -486,6 +506,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun openSetDefaultLauncher(context: Context) {
+        if (!authRepository.hasValidSession()) {
+            _currentScreen.value = LauncherScreen.ONBOARDING
+            return
+        }
         val intents = listOf(
             Intent(Settings.ACTION_HOME_SETTINGS),
             Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
@@ -522,9 +546,26 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             authSession.collect { session ->
                 if (session != null) {
                     _authState.value = AuthState.Authenticated(session)
-                } else if (_authState.value is AuthState.Authenticated) {
-                    _authState.value = AuthState.Idle
+                } else {
+                    if (_authState.value is AuthState.Authenticated) {
+                        _authState.value = AuthState.Idle
+                    }
+                    if (_currentScreen.value != LauncherScreen.ONBOARDING) {
+                        _currentScreen.value = LauncherScreen.ONBOARDING
+                    }
                 }
+            }
+        }
+        checkSessionValidation()
+    }
+
+    fun checkSessionValidation() {
+        if (!authRepository.hasValidSession()) return
+        viewModelScope.launch {
+            val result = authRepository.validateSessionIfNeeded()
+            if (result is SessionValidationResult.Invalid) {
+                _authState.value = AuthState.Error(result.reason)
+                _currentScreen.value = LauncherScreen.ONBOARDING
             }
         }
     }
@@ -541,7 +582,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 onFailure = { error ->
                     if (error is GoogleAuthCancellationException) {
                         val currentSession = prefs.getAuthSession()
-                        _authState.value = if (currentSession != null) {
+                        _authState.value = if (currentSession != null && authRepository.hasValidSession()) {
                             AuthState.Authenticated(currentSession)
                         } else {
                             AuthState.Idle
@@ -559,11 +600,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun logout() {
         authRepository.logout()
         _authState.value = AuthState.Idle
+        _currentScreen.value = LauncherScreen.ONBOARDING
     }
 
     fun dismissAuthError() {
         val currentSession = prefs.getAuthSession()
-        _authState.value = if (currentSession != null) {
+        _authState.value = if (currentSession != null && authRepository.hasValidSession()) {
             AuthState.Authenticated(currentSession)
         } else {
             AuthState.Idle
