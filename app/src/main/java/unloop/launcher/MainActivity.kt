@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import unloop.launcher.ui.LauncherScreen
 import unloop.launcher.ui.LauncherViewModel
 import unloop.launcher.ui.screens.AboutScreen
+import unloop.launcher.ui.screens.AccountScreen
 import unloop.launcher.ui.screens.AllAppsScreen
 import unloop.launcher.ui.screens.AppCleanupScreen
 import unloop.launcher.ui.screens.AppMenuDialog
@@ -86,6 +87,7 @@ fun LauncherRoot(
     val isUsageAccessGranted by viewModel.isUsageAccessGranted.collectAsState()
     val isUsageBannerDismissed by viewModel.isUsageBannerDismissed.collectAsState()
     val showSystemAppsCleanup by viewModel.showSystemAppsCleanup.collectAsState()
+    val authState by viewModel.authState.collectAsState()
 
     Crossfade(targetState = currentScreen, label = "ScreenTransition") { screen ->
         when (screen) {
@@ -150,6 +152,8 @@ fun LauncherRoot(
                     onOpenNotifications = { viewModel.openNotifications(LauncherScreen.SETTINGS) },
                     onOpenScreenTime = { viewModel.openSystemDigitalWellbeing(activity) },
                     onChangeTheme = { viewModel.setThemeMode(it) },
+                    authState = authState,
+                    onOpenAccount = { viewModel.navigateTo(LauncherScreen.ACCOUNT) },
                     onOpenAbout = { viewModel.navigateTo(LauncherScreen.ABOUT) },
                     onBackToHome = { viewModel.navigateTo(LauncherScreen.HOME) }
                 )
@@ -194,6 +198,16 @@ fun LauncherRoot(
                     onDismissNotification = { viewModel.dismissFilteredNotification(it) },
                     onNotificationClick = { viewModel.launchApp(it.packageName) },
                     onBack = { viewModel.backFromNotifications() }
+                )
+            }
+
+            LauncherScreen.ACCOUNT -> {
+                AccountScreen(
+                    authState = authState,
+                    onLoginClick = { viewModel.loginWithGoogle(activity) },
+                    onLogoutClick = { viewModel.logout() },
+                    onDismissError = { viewModel.dismissAuthError() },
+                    onBack = { viewModel.navigateTo(LauncherScreen.SETTINGS) }
                 )
             }
 

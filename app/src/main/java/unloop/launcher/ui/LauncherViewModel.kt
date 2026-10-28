@@ -10,6 +10,10 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import unloop.launcher.auth.AuthRepository
+import unloop.launcher.auth.GoogleAuthCancellationException
+import unloop.launcher.auth.model.AuthSession
+import unloop.launcher.auth.model.AuthState
 import unloop.launcher.data.AppItem
 import unloop.launcher.data.AppsRepository
 import unloop.launcher.data.PreferencesManager
@@ -35,13 +39,20 @@ enum class LauncherScreen {
     HIDDEN_APPS,
     NOTIFICATIONS,
     ABOUT,
-    APP_CLEANUP
+    APP_CLEANUP,
+    ACCOUNT
 }
 
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = PreferencesManager.getInstance(application)
     private val repository = AppsRepository(application, prefs)
+    private val authRepository = AuthRepository(prefs)
+    val authSession: StateFlow<AuthSession?> = authRepository.authSessionFlow
+    private val _authState = MutableStateFlow<AuthState>(
+        prefs.getAuthSession()?.let { AuthState.Authenticated(it) } ?: AuthState.Idle
+    )
+    val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
     private val _currentScreen = MutableStateFlow(determineInitialScreen())
     val currentScreen: StateFlow<LauncherScreen> = _currentScreen.asStateFlow()
@@ -504,6 +515,58 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 context.startActivity(intent)
                 return
             } catch (_: Exception) {}
+        }
+    }
+    init {
+        viewModelScope.launch {
+            authSession.collect { session ->
+                if (session != null) {
+                    _authState.value = AuthState.Authenticated(session)
+                } else if (_authState.value is AuthState.Authenticated) {
+                    _authState.value = AuthState.Idle
+                }
+            }
+        }
+    }
+
+    fun loginWithGoogle(activityContext: Context) {
+        if (_authState.value is AuthState.Loading) return
+        _authState.value = AuthState.Loading
+        viewModelScope.launch {
+            val result = authRepository.loginWithGoogle(activityContext)
+            result.fold(
+                onSuccess = { session ->
+                    _authState.value = AuthState.Authenticated(session)
+                },
+                onFailure = { error ->
+                    if (error is GoogleAuthCancellationException) {
+                        val currentSession = prefs.getAuthSession()
+                        _authState.value = if (currentSession != null) {
+                            AuthState.Authenticated(currentSession)
+                        } else {
+                            AuthState.Idle
+                        }
+                    } else {
+                        _authState.value = AuthState.Error(
+                            error.message ?: "Authentication failed. Please check your connection and try again."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun logout() {
+        authRepository.logout()
+        _authState.value = AuthState.Idle
+    }
+
+    fun dismissAuthError() {
+        val currentSession = prefs.getAuthSession()
+        _authState.value = if (currentSession != null) {
+            AuthState.Authenticated(currentSession)
+        } else {
+            AuthState.Idle
         }
     }
 }

@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import unloop.launcher.ui.components.PermissionRationaleDialog
+import unloop.launcher.auth.model.AuthState
 import unloop.launcher.util.AppVersionUtils
 
 @Composable
@@ -60,6 +61,8 @@ fun SettingsScreen(
     onOpenNotifications: () -> Unit,
     onOpenScreenTime: () -> Unit,
     onChangeTheme: (String) -> Unit,
+    authState: AuthState = AuthState.Idle,
+    onOpenAccount: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onBackToHome: () -> Unit
 ) {
@@ -306,6 +309,38 @@ fun SettingsScreen(
                     )
                 },
                 onClick = onOpenScreenTime
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // --- SECTION: ACCOUNT ---
+            SectionHeader(title = "ACCOUNT")
+
+            val accountSubtitle = when (authState) {
+                is AuthState.Authenticated -> authState.session.user.email
+                is AuthState.Loading -> "Signing in..."
+                is AuthState.Error -> "Sign-in error - tap to view"
+                AuthState.Idle -> "Sign in with Google"
+            }
+
+            val accountTrailing = when (authState) {
+                is AuthState.Authenticated -> "Signed in"
+                is AuthState.Loading -> "..."
+                is AuthState.Error -> "Fix"
+                AuthState.Idle -> "Sign in"
+            }
+
+            SettingItem(
+                title = "Account",
+                subtitle = accountSubtitle,
+                trailing = {
+                    Text(
+                        text = accountTrailing,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                },
+                onClick = onOpenAccount
             )
 
             Spacer(modifier = Modifier.height(32.dp))
