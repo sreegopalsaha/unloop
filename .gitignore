@@ -1,5 +1,6 @@
 *.iml
 .gradle
+.kotlin/
 /local.properties
 /.idea
 .DS_Store
@@ -9,4 +10,9 @@
 .cxx
 local.properties
 decompiled/
+
+# Keystore & signing credentials
+*.jks
+*.keystore
+keystore.properties
 
