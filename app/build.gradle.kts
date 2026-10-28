@@ -4,13 +4,13 @@ plugins {
 }
 
 android {
-    namespace = "com.unloop.launcher"
+    namespace = "unloop.launcher"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.unloop.launcher"
+        applicationId = "unloop.launcher"
         minSdk = 26
         targetSdk = 37
         versionCode = 1

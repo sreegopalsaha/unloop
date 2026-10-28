@@ -95,7 +95,7 @@ Ensure an Android device or emulator with developer options enabled is connected
 ```text
 app/src/main/
 ├── AndroidManifest.xml          # Permissions, launcher intent filters, and service declarations
-└── java/com/unloop/launcher/
+└── java/unloop/launcher/
     ├── MainActivity.kt          # Single-activity host with Compose crossfade screen transitions
     ├── data/
     │   ├── AppModel.kt          # Domain models for launcher apps and categorization
