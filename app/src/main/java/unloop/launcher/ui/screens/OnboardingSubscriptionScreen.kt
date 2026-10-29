@@ -63,6 +63,7 @@ fun OnboardingSubscriptionScreen(
     onRetryPaymentVerification: () -> Unit = onRetrySync,
     onOpenHomeSettings: () -> Unit = {},
     onCompleteOnboarding: () -> Unit = {},
+    onProceedToLauncherSetup: () -> Unit = onCompleteOnboarding,
     modifier: Modifier = Modifier
 ) {
     var selectedPlanId by remember { mutableStateOf(PricingHelper.PLAN_MONTHLY) }
@@ -307,7 +308,7 @@ fun OnboardingSubscriptionScreen(
 
         if (isEntitled) {
             Button(
-                onClick = onCompleteOnboarding,
+                onClick = onProceedToLauncherSetup,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
@@ -318,7 +319,7 @@ fun OnboardingSubscriptionScreen(
                     .height(54.dp)
             ) {
                 Text(
-                    text = "Premium Active • Open Unloop",
+                    text = "Premium Active • Set as Default Launcher",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                 )
             }

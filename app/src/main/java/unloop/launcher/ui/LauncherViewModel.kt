@@ -482,24 +482,29 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         if (!isEntitled) {
             return LauncherScreen.ONBOARDING
         }
-        val isDefault = checkIfDefaultLauncher()
-        val isIntroDone = prefs.isIntroCompleted()
-        return if (!isIntroDone || !isDefault) {
-            LauncherScreen.ONBOARDING
-        } else {
-            LauncherScreen.HOME
+        // If onboarding has not been completed, check if default setup or intro is pending
+        if (!prefs.isOnboardingCompleted()) {
+            if (checkIfDefaultLauncher() && prefs.isIntroCompleted()) {
+                prefs.setOnboardingCompleted(true)
+                return LauncherScreen.HOME
+            }
+            return LauncherScreen.ONBOARDING
         }
+        return LauncherScreen.HOME
     }
 
     fun getInitialOnboardingPage(): Int {
         if (!authRepository.hasValidSession()) {
             return 0
         }
+        if (!prefs.isIntroCompleted()) {
+            return 1
+        }
         val isEntitled = subscriptionRepository.evaluateLocalEntitlement()
         if (!isEntitled) {
             return 2 // Subscription Onboarding Screen
         }
-        return if (prefs.isIntroCompleted() && !checkIfDefaultLauncher()) 3 else 1
+        return 3 // Default Launcher Setup
     }
 
     fun markIntroCompleted() {
@@ -520,8 +525,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         val isDefault = checkIfDefaultLauncher()
         _isDefaultLauncher.value = isDefault
         if (isDefault && authRepository.hasValidSession() && subscriptionRepository.evaluateLocalEntitlement()) {
-            prefs.setOnboardingCompleted(true)
-            if (_currentScreen.value == LauncherScreen.ONBOARDING) {
+            if (prefs.isOnboardingCompleted() && _currentScreen.value == LauncherScreen.ONBOARDING) {
                 _currentScreen.value = LauncherScreen.HOME
             }
         }
@@ -588,17 +592,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 }
             }
         }
-        viewModelScope.launch {
-            isEntitled.collect { entitled ->
-                if (entitled && authRepository.hasValidSession()) {
-                    prefs.setIntroCompleted(true)
-                    prefs.setOnboardingCompleted(true)
-                    if (_currentScreen.value == LauncherScreen.ONBOARDING) {
-                        _currentScreen.value = LauncherScreen.HOME
-                    }
-                }
-            }
-        }
         checkSessionValidation()
     }
 
@@ -612,9 +605,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             } else {
                 val syncResult = subscriptionRepository.synchronizeEntitlement(forceServerCheck = false)
                 if (syncResult.isSuccess && syncResult.getOrNull()?.isEntitled == true) {
-                    prefs.setIntroCompleted(true)
-                    prefs.setOnboardingCompleted(true)
-                    if (_currentScreen.value == LauncherScreen.ONBOARDING) {
+                    if (prefs.isOnboardingCompleted() && _currentScreen.value == LauncherScreen.ONBOARDING) {
                         _currentScreen.value = LauncherScreen.HOME
                     }
                 }
@@ -653,6 +644,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun logout() {
         authRepository.logout()
         subscriptionRepository.onUserLoggedOut()
+        prefs.setIntroCompleted(false)
+        prefs.setOnboardingCompleted(false)
         _authState.value = AuthState.Idle
         _currentScreen.value = LauncherScreen.ONBOARDING
     }
@@ -742,14 +735,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             if (syncResult.isSuccess && syncResult.getOrNull()?.isEntitled == true) {
                 lastFailedPayment = null
                 _hasPendingPaymentVerification.value = false
-                completeOnboarding()
+                if (_currentScreen.value != LauncherScreen.ONBOARDING) {
+                    _currentScreen.value = LauncherScreen.HOME
+                }
             } else if (subscriptionRepository.evaluateLocalEntitlement()) {
                 lastFailedPayment = null
                 _hasPendingPaymentVerification.value = false
-                completeOnboarding()
+                if (_currentScreen.value != LauncherScreen.ONBOARDING) {
+                    _currentScreen.value = LauncherScreen.HOME
+                }
             } else {
-                _subscriptionErrorMessage.value = "Lifetime Premium confirmed. Opening Unloop..."
-                completeOnboarding()
+                _subscriptionErrorMessage.value = "Unable to synchronize entitlement with server. Please retry in a moment."
             }
         }
     }
@@ -777,7 +773,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                         pendingMonthlyIntent = null
                         lastFailedPayment = null
                         _hasPendingPaymentVerification.value = false
-                        completeOnboarding()
+                        if (_currentScreen.value != LauncherScreen.ONBOARDING) {
+                            _currentScreen.value = LauncherScreen.HOME
+                        }
                     },
                     onFailure = { error ->
                         _isSubscriptionProcessing.value = false
@@ -800,7 +798,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                         pendingLifetimeIntent = null
                         lastFailedPayment = null
                         _hasPendingPaymentVerification.value = false
-                        completeOnboarding()
+                        if (_currentScreen.value != LauncherScreen.ONBOARDING) {
+                            _currentScreen.value = LauncherScreen.HOME
+                        }
                     },
                     onFailure = { error ->
                         _isSubscriptionProcessing.value = false
@@ -819,7 +819,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 val syncResult = subscriptionRepository.synchronizeEntitlement(forceServerCheck = true)
                 _isSubscriptionProcessing.value = false
                 if (syncResult.isSuccess && syncResult.getOrNull()?.isEntitled == true) {
-                    completeOnboarding()
+                    if (_currentScreen.value != LauncherScreen.ONBOARDING) {
+                        _currentScreen.value = LauncherScreen.HOME
+                    }
                 } else {
                     _subscriptionErrorMessage.value = "Payment completed. Syncing entitlement with server..."
                 }
@@ -860,7 +862,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                         _isSubscriptionProcessing.value = false
                         lastFailedPayment = null
                         _hasPendingPaymentVerification.value = false
-                        completeOnboarding()
+                        if (_currentScreen.value != LauncherScreen.ONBOARDING) {
+                            _currentScreen.value = LauncherScreen.HOME
+                        }
                     },
                     onFailure = { error ->
                         // Also check if server already has user entitlement set
@@ -869,7 +873,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                         if (syncResult.isSuccess && syncResult.getOrNull()?.isEntitled == true) {
                             lastFailedPayment = null
                             _hasPendingPaymentVerification.value = false
-                            completeOnboarding()
+                            if (_currentScreen.value != LauncherScreen.ONBOARDING) {
+                                _currentScreen.value = LauncherScreen.HOME
+                            }
                         } else {
                             _subscriptionErrorMessage.value = "Server verification retry failed: ${error.message}. Please retry in a moment."
                         }
@@ -890,7 +896,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             if (result.isSuccess && result.getOrNull()?.isEntitled == true) {
                 lastFailedPayment = null
                 _hasPendingPaymentVerification.value = false
-                completeOnboarding()
+                if (_currentScreen.value != LauncherScreen.ONBOARDING) {
+                    _currentScreen.value = LauncherScreen.HOME
+                }
             } else {
                 result.onFailure { error ->
                     _subscriptionErrorMessage.value = "Sync notice: ${error.message}. Check connection and retry."
@@ -908,17 +916,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun openAndroidHomeSettings(activity: Activity) {
-        val intents = listOf(
-            Intent(Settings.ACTION_HOME_SETTINGS),
-            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
-            Intent(Settings.ACTION_SETTINGS)
-        )
-        for (intent in intents) {
-            try {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                activity.startActivity(intent)
-                return
-            } catch (_: Exception) {}
-        }
+        openSetDefaultLauncher(activity)
     }
 }

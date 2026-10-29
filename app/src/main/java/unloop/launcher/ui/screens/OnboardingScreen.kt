@@ -85,9 +85,9 @@ fun OnboardingScreen(
     BackHandler(enabled = pagerState.currentPage > 0) {
         coroutineScope.launch {
             when (pagerState.currentPage) {
-                2 -> pagerState.animateScrollToPage(1)
-                3 -> pagerState.animateScrollToPage(2)
                 1 -> pagerState.animateScrollToPage(0)
+                2 -> pagerState.animateScrollToPage(1)
+                3 -> pagerState.animateScrollToPage(if (isEntitled) 1 else 2)
             }
         }
     }
@@ -96,6 +96,8 @@ fun OnboardingScreen(
     LaunchedEffect(isAuthenticated) {
         if (isAuthenticated && pagerState.currentPage == 0) {
             pagerState.animateScrollToPage(1)
+        } else if (!isAuthenticated && pagerState.currentPage != 0) {
+            pagerState.scrollToPage(0)
         }
     }
 
@@ -106,9 +108,9 @@ fun OnboardingScreen(
         }
     }
 
-    // Mark intro completed as soon as user navigates to the default launcher setup screen (page 3) with valid auth and entitlement
-    LaunchedEffect(pagerState.currentPage, isAuthenticated, isEntitled) {
-        if (pagerState.currentPage >= 3 && isAuthenticated && isEntitled) {
+    // Mark intro completed as soon as user views Page 1 or advances beyond it
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage >= 1) {
             onIntroCompleted()
         }
     }
@@ -121,7 +123,7 @@ fun OnboardingScreen(
         // Main Pager with 4 screens:
         // Page 0: "Continue with Google"
         // Page 1: "Welcome to Unloop" (Marketing / App Explanation)
-        // Page 2: NEW "Subscription & Payment" Onboarding Screen
+        // Page 2: "Subscription & Payment" Onboarding Screen
         // Page 3: "Set as Default Launcher"
         HorizontalPager(
             state = pagerState,
@@ -139,94 +141,59 @@ fun OnboardingScreen(
                 )
 
                 1 -> {
-                    if (isAuthenticated) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 24.dp)
-                                .padding(top = 80.dp, bottom = 100.dp)
-                        ) {
-                            OnboardingExplainAppScreen()
-                        }
-                    } else {
-                        OnboardingSignInScreen(
-                            authState = authState,
-                            onContinueWithGoogle = onContinueWithGoogle
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp)
+                            .padding(top = 80.dp, bottom = 100.dp)
+                    ) {
+                        OnboardingExplainAppScreen()
                     }
                 }
 
                 2 -> {
-                    if (isAuthenticated) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 24.dp)
-                                .padding(top = 70.dp, bottom = 24.dp)
-                        ) {
-                            OnboardingSubscriptionScreen(
-                                plans = plans,
-                                isProcessing = isSubscriptionProcessing,
-                                errorMessage = subscriptionErrorMessage,
-                                hasPendingPaymentVerification = hasPendingPaymentVerification,
-                                isEntitled = isEntitled,
-                                onSubscribeMonthly = onSubscribeMonthly,
-                                onPurchaseLifetime = onPurchaseLifetime,
-                                onClearError = onClearSubscriptionError,
-                                onRetrySync = onRetrySubscriptionSync,
-                                onRetryPaymentVerification = onRetryPaymentVerification,
-                                onOpenHomeSettings = onOpenHomeSettings,
-                                onCompleteOnboarding = onCompleteOnboarding
-                            )
-                        }
-                    } else {
-                        OnboardingSignInScreen(
-                            authState = authState,
-                            onContinueWithGoogle = onContinueWithGoogle
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp)
+                            .padding(top = 70.dp, bottom = 24.dp)
+                    ) {
+                        OnboardingSubscriptionScreen(
+                            plans = plans,
+                            isProcessing = isSubscriptionProcessing,
+                            errorMessage = subscriptionErrorMessage,
+                            hasPendingPaymentVerification = hasPendingPaymentVerification,
+                            isEntitled = isEntitled,
+                            onSubscribeMonthly = onSubscribeMonthly,
+                            onPurchaseLifetime = onPurchaseLifetime,
+                            onClearError = onClearSubscriptionError,
+                            onRetrySync = onRetrySubscriptionSync,
+                            onRetryPaymentVerification = onRetryPaymentVerification,
+                            onOpenHomeSettings = onOpenHomeSettings,
+                            onProceedToLauncherSetup = {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(3)
+                                }
+                            },
+                            onCompleteOnboarding = {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(3)
+                                }
+                            }
                         )
                     }
                 }
 
                 3 -> {
-                    if (isAuthenticated && isEntitled) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 24.dp)
-                                .padding(top = 80.dp, bottom = 120.dp)
-                        ) {
-                            OnboardingDefaultLauncherScreen(
-                                isDefaultLauncher = isDefaultLauncher,
-                                onSetDefaultLauncher = onSetDefaultLauncher
-                            )
-                        }
-                    } else if (isAuthenticated) {
-                        // Redirect to subscription gate
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 24.dp)
-                                .padding(top = 70.dp, bottom = 24.dp)
-                        ) {
-                            OnboardingSubscriptionScreen(
-                                plans = plans,
-                                isProcessing = isSubscriptionProcessing,
-                                errorMessage = subscriptionErrorMessage,
-                                hasPendingPaymentVerification = hasPendingPaymentVerification,
-                                isEntitled = isEntitled,
-                                onSubscribeMonthly = onSubscribeMonthly,
-                                onPurchaseLifetime = onPurchaseLifetime,
-                                onClearError = onClearSubscriptionError,
-                                onRetrySync = onRetrySubscriptionSync,
-                                onRetryPaymentVerification = onRetryPaymentVerification,
-                                onOpenHomeSettings = onOpenHomeSettings,
-                                onCompleteOnboarding = onCompleteOnboarding
-                            )
-                        }
-                    } else {
-                        OnboardingSignInScreen(
-                            authState = authState,
-                            onContinueWithGoogle = onContinueWithGoogle
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp)
+                            .padding(top = 80.dp, bottom = 120.dp)
+                    ) {
+                        OnboardingDefaultLauncherScreen(
+                            isDefaultLauncher = isDefaultLauncher,
+                            onSetDefaultLauncher = onSetDefaultLauncher
                         )
                     }
                 }
@@ -286,8 +253,10 @@ fun OnboardingScreen(
                         ) {
                             TextButton(
                                 onClick = {
+                                    onIntroCompleted()
                                     coroutineScope.launch {
-                                        pagerState.animateScrollToPage(2)
+                                        val target = if (isEntitled) 3 else 2
+                                        pagerState.animateScrollToPage(target)
                                     }
                                 }
                             ) {
@@ -300,8 +269,10 @@ fun OnboardingScreen(
 
                             Button(
                                 onClick = {
+                                    onIntroCompleted()
                                     coroutineScope.launch {
-                                        pagerState.animateScrollToPage(2)
+                                        val target = if (isEntitled) 3 else 2
+                                        pagerState.animateScrollToPage(target)
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(
@@ -320,58 +291,56 @@ fun OnboardingScreen(
                     }
 
                     3 -> {
-                        if (isAuthenticated && isEntitled) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                if (isDefaultLauncher) {
-                                    Button(
-                                        onClick = onCompleteOnboarding,
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary
-                                        ),
-                                        shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(52.dp)
-                                    ) {
-                                        Text(
-                                            text = "Get Started",
-                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                                        )
-                                    }
-                                } else {
-                                    Button(
-                                        onClick = onSetDefaultLauncher,
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary
-                                        ),
-                                        shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(52.dp)
-                                    ) {
-                                        Text(
-                                            text = "Set as Default Launcher",
-                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                                        )
-                                    }
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            if (isDefaultLauncher) {
+                                Button(
+                                    onClick = onCompleteOnboarding,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(52.dp)
+                                ) {
+                                    Text(
+                                        text = "Get Started",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                                    )
+                                }
+                            } else {
+                                Button(
+                                    onClick = onSetDefaultLauncher,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(52.dp)
+                                ) {
+                                    Text(
+                                        text = "Set as Default Launcher",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                                    )
+                                }
 
-                                    Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(10.dp))
 
-                                    TextButton(
-                                        onClick = onCompleteOnboarding,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(
-                                            text = "Continue without setting default",
-                                            color = MaterialTheme.colorScheme.secondary,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
+                                TextButton(
+                                    onClick = onCompleteOnboarding,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "Continue without setting default",
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
                                 }
                             }
                         }
