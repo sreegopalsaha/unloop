@@ -507,6 +507,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         return 3 // Default Launcher Setup
     }
 
+    fun isIntroCompleted(): Boolean = prefs.isIntroCompleted()
+
     fun markIntroCompleted() {
         prefs.setIntroCompleted(true)
     }

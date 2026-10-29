@@ -10,6 +10,8 @@ import unloop.launcher.auth.FakeSharedPreferences
 import unloop.launcher.auth.model.AuthSession
 import unloop.launcher.auth.model.UserProfile
 import unloop.launcher.data.PreferencesManager
+import unloop.launcher.ui.screens.OnboardingStep
+import unloop.launcher.ui.screens.getActiveOnboardingSteps
 
 class OnboardingFlowTest {
 
@@ -193,5 +195,93 @@ class OnboardingFlowTest {
         // Step 2: User paid, but OS killed app before setting default launcher
         assertEquals(3, getInitialOnboardingPage(hasAuth = true, isEntitled = true))
         assertEquals("ONBOARDING", determineInitialScreen(hasAuth = true, isEntitled = true, isDefaultLauncher = false))
+    }
+
+    @Test
+    fun testActiveOnboardingSteps_brandNewUser_includesAllStepsEndingInAllSet() {
+        val steps = getActiveOnboardingSteps(
+            isIntroCompleted = false,
+            isEntitled = false,
+            isDefaultLauncher = false
+        )
+        assertEquals(
+            listOf(
+                OnboardingStep.EXPLAIN,
+                OnboardingStep.SUBSCRIPTION,
+                OnboardingStep.DEFAULT_LAUNCHER,
+                OnboardingStep.ALL_SET
+            ),
+            steps
+        )
+    }
+
+    @Test
+    fun testActiveOnboardingSteps_alreadySubscribedUser_completelySkipsSubscriptionScreen() {
+        val steps = getActiveOnboardingSteps(
+            isIntroCompleted = false,
+            isEntitled = true,
+            isDefaultLauncher = false
+        )
+        // Subscription must be completely omitted from the active onboarding steps
+        assertFalse(steps.contains(OnboardingStep.SUBSCRIPTION))
+        assertEquals(
+            listOf(
+                OnboardingStep.EXPLAIN,
+                OnboardingStep.DEFAULT_LAUNCHER,
+                OnboardingStep.ALL_SET
+            ),
+            steps
+        )
+    }
+
+    @Test
+    fun testActiveOnboardingSteps_alreadyDefaultLauncher_completelySkipsDefaultLauncherScreen() {
+        val steps = getActiveOnboardingSteps(
+            isIntroCompleted = false,
+            isEntitled = false,
+            isDefaultLauncher = true
+        )
+        // Default launcher screen must be completely omitted
+        assertFalse(steps.contains(OnboardingStep.DEFAULT_LAUNCHER))
+        assertEquals(
+            listOf(
+                OnboardingStep.EXPLAIN,
+                OnboardingStep.SUBSCRIPTION,
+                OnboardingStep.ALL_SET
+            ),
+            steps
+        )
+    }
+
+    @Test
+    fun testActiveOnboardingSteps_alreadySubscribedAndDefault_skipsBothToFinalAllSet() {
+        val steps = getActiveOnboardingSteps(
+            isIntroCompleted = false,
+            isEntitled = true,
+            isDefaultLauncher = true
+        )
+        // Both subscription and default launcher must be completely omitted
+        assertFalse(steps.contains(OnboardingStep.SUBSCRIPTION))
+        assertFalse(steps.contains(OnboardingStep.DEFAULT_LAUNCHER))
+        assertEquals(
+            listOf(
+                OnboardingStep.EXPLAIN,
+                OnboardingStep.ALL_SET
+            ),
+            steps
+        )
+    }
+
+    @Test
+    fun testActiveOnboardingSteps_allPriorStepsCompleted_showsOnlyFinalAllSetScreen() {
+        val steps = getActiveOnboardingSteps(
+            isIntroCompleted = true,
+            isEntitled = true,
+            isDefaultLauncher = true
+        )
+        assertEquals(
+            listOf(OnboardingStep.ALL_SET),
+            steps
+        )
     }
 }

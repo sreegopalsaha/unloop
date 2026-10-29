@@ -1,9 +1,7 @@
 package unloop.launcher.ui.screens
 
 import androidx.activity.compose.BackHandler
-
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -34,7 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +41,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -52,9 +51,28 @@ import unloop.launcher.R
 import unloop.launcher.auth.model.AuthState
 import unloop.launcher.subscription.model.SubscriptionPlan
 
+enum class OnboardingStep {
+    EXPLAIN,
+    SUBSCRIPTION,
+    DEFAULT_LAUNCHER,
+    ALL_SET
+}
+
+fun getActiveOnboardingSteps(
+    isIntroCompleted: Boolean,
+    isEntitled: Boolean,
+    isDefaultLauncher: Boolean
+): List<OnboardingStep> = buildList {
+    if (!isIntroCompleted) add(OnboardingStep.EXPLAIN)
+    if (!isEntitled) add(OnboardingStep.SUBSCRIPTION)
+    if (!isDefaultLauncher) add(OnboardingStep.DEFAULT_LAUNCHER)
+    add(OnboardingStep.ALL_SET)
+}
+
 @Composable
 fun OnboardingScreen(
     isDefaultLauncher: Boolean,
+    isIntroCompleted: Boolean = false,
     initialPage: Int = 0,
     authState: AuthState = AuthState.Idle,
     isEntitled: Boolean = false,
@@ -74,275 +92,260 @@ fun OnboardingScreen(
     onCompleteOnboarding: () -> Unit,
     onIntroCompleted: () -> Unit
 ) {
-    val pageCount = 4
-    val pagerState = rememberPagerState(
-        initialPage = initialPage.coerceIn(0, pageCount - 1)
-    ) { pageCount }
     val coroutineScope = rememberCoroutineScope()
     val isAuthenticated = authState is AuthState.Authenticated
 
-    // Android Back Handler safeguard to prevent launcher lockout on onboarding/subscription
-    BackHandler(enabled = pagerState.currentPage > 0) {
-        coroutineScope.launch {
-            when (pagerState.currentPage) {
-                1 -> pagerState.animateScrollToPage(0)
-                2 -> pagerState.animateScrollToPage(1)
-                3 -> pagerState.animateScrollToPage(if (isEntitled) 1 else 2)
-            }
-        }
-    }
+    Crossfade(
+        targetState = isAuthenticated,
+        label = "AuthOnboardingCrossfade"
+    ) { authenticated ->
+        if (!authenticated) {
+            OnboardingSignInScreen(
+                authState = authState,
+                onContinueWithGoogle = onContinueWithGoogle
+            )
+        } else {
+            // Track if intro was already completed when this session started so we don't
+            // abruptly drop the explain screen while the user is actively viewing it.
+            val initialIntroCompleted = remember { isIntroCompleted }
 
-    // Auto-advance to Page 1 (Welcome to Unloop) as soon as user successfully signs in on Page 0
-    LaunchedEffect(isAuthenticated) {
-        if (isAuthenticated && pagerState.currentPage == 0) {
-            pagerState.animateScrollToPage(1)
-        } else if (!isAuthenticated && pagerState.currentPage != 0) {
-            pagerState.scrollToPage(0)
-        }
-    }
-
-    // Auto-advance to Page 3 (Default Launcher) as soon as user becomes entitled on Page 2
-    LaunchedEffect(isEntitled, pagerState.currentPage) {
-        if (isEntitled && pagerState.currentPage == 2) {
-            pagerState.animateScrollToPage(3)
-        }
-    }
-
-    // Mark intro completed as soon as user views Page 1 or advances beyond it
-    LaunchedEffect(pagerState.currentPage) {
-        if (pagerState.currentPage >= 1) {
-            onIntroCompleted()
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        // Main Pager with 4 screens:
-        // Page 0: "Continue with Google"
-        // Page 1: "Welcome to Unloop" (Marketing / App Explanation)
-        // Page 2: "Subscription & Payment" Onboarding Screen
-        // Page 3: "Set as Default Launcher"
-        HorizontalPager(
-            state = pagerState,
-            userScrollEnabled = when (pagerState.currentPage) {
-                0 -> false
-                2 -> isEntitled // Gate: Cannot swipe past subscription until entitled
-                else -> true
-            },
-            modifier = Modifier.fillMaxSize()
-        ) { page ->
-            when (page) {
-                0 -> OnboardingSignInScreen(
-                    authState = authState,
-                    onContinueWithGoogle = onContinueWithGoogle
-                )
-
-                1 -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 24.dp)
-                            .padding(top = 80.dp, bottom = 100.dp)
-                    ) {
-                        OnboardingExplainAppScreen()
-                    }
-                }
-
-                2 -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 24.dp)
-                            .padding(top = 70.dp, bottom = 24.dp)
-                    ) {
-                        OnboardingSubscriptionScreen(
-                            plans = plans,
-                            isProcessing = isSubscriptionProcessing,
-                            errorMessage = subscriptionErrorMessage,
-                            hasPendingPaymentVerification = hasPendingPaymentVerification,
-                            isEntitled = isEntitled,
-                            onSubscribeMonthly = onSubscribeMonthly,
-                            onPurchaseLifetime = onPurchaseLifetime,
-                            onClearError = onClearSubscriptionError,
-                            onRetrySync = onRetrySubscriptionSync,
-                            onRetryPaymentVerification = onRetryPaymentVerification,
-                            onOpenHomeSettings = onOpenHomeSettings,
-                            onProceedToLauncherSetup = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(3)
-                                }
-                            },
-                            onCompleteOnboarding = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(3)
-                                }
-                            }
-                        )
-                    }
-                }
-
-                3 -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 24.dp)
-                            .padding(top = 80.dp, bottom = 120.dp)
-                    ) {
-                        OnboardingDefaultLauncherScreen(
-                            isDefaultLauncher = isDefaultLauncher,
-                            onSetDefaultLauncher = onSetDefaultLauncher
-                        )
-                    }
-                }
-            }
-        }
-
-        // Top Minimalist Progress Indicators
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(vertical = 16.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            repeat(pageCount) { index ->
-                val isSelected = pagerState.currentPage == index
-                val width by animateDpAsState(
-                    targetValue = if (isSelected) 32.dp else 8.dp,
-                    label = "IndicatorWidth"
-                )
-                val color by animateColorAsState(
-                    targetValue = if (isSelected) {
-                        if (pagerState.currentPage == 0) Color.White else MaterialTheme.colorScheme.primary
-                    } else {
-                        if (pagerState.currentPage == 0) Color.White.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    label = "IndicatorColor"
-                )
-
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .height(4.dp)
-                        .width(width)
-                        .clip(CircleShape)
-                        .background(color)
+            val steps = remember(initialIntroCompleted, isEntitled, isDefaultLauncher) {
+                getActiveOnboardingSteps(
+                    isIntroCompleted = initialIntroCompleted,
+                    isEntitled = isEntitled,
+                    isDefaultLauncher = isDefaultLauncher
                 )
             }
-        }
 
-        // Bottom Actions & Navigation (for Page 1 and Page 3)
-        if (pagerState.currentPage == 1 || pagerState.currentPage == 3) {
+            val pagerState = rememberPagerState(
+                initialPage = 0
+            ) { steps.size }
+
+            LaunchedEffect(steps.size) {
+                if (pagerState.currentPage >= steps.size) {
+                    pagerState.scrollToPage((steps.size - 1).coerceAtLeast(0))
+                }
+            }
+
+            // Android Back Handler safeguard to navigate back within active onboarding steps
+            BackHandler(enabled = pagerState.currentPage > 0) {
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                }
+            }
+
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 24.dp)
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
             ) {
-                when (pagerState.currentPage) {
-                    1 -> {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(
-                                onClick = {
-                                    onIntroCompleted()
-                                    coroutineScope.launch {
-                                        val target = if (isEntitled) 3 else 2
-                                        pagerState.animateScrollToPage(target)
-                                    }
-                                }
+                HorizontalPager(
+                    state = pagerState,
+                    userScrollEnabled = when (steps.getOrNull(pagerState.currentPage)) {
+                        OnboardingStep.SUBSCRIPTION -> isEntitled // Gate: Cannot swipe past subscription until entitled
+                        else -> true
+                    },
+                    modifier = Modifier.fillMaxSize()
+                ) { pageIndex ->
+                    val step = steps.getOrNull(pageIndex) ?: return@HorizontalPager
+                    when (step) {
+                        OnboardingStep.EXPLAIN -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 24.dp)
+                                    .padding(top = 40.dp, bottom = 100.dp)
                             ) {
-                                Text(
-                                    text = "Skip",
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
+                                OnboardingExplainAppScreen()
                             }
+                        }
 
-                            Button(
-                                onClick = {
-                                    onIntroCompleted()
-                                    coroutineScope.launch {
-                                        val target = if (isEntitled) 3 else 2
-                                        pagerState.animateScrollToPage(target)
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                ),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.height(48.dp)
+                        OnboardingStep.SUBSCRIPTION -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 24.dp)
+                                    .padding(top = 40.dp, bottom = 24.dp)
                             ) {
-                                Text(
-                                    text = "Next",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium)
+                                OnboardingSubscriptionScreen(
+                                    plans = plans,
+                                    isProcessing = isSubscriptionProcessing,
+                                    errorMessage = subscriptionErrorMessage,
+                                    hasPendingPaymentVerification = hasPendingPaymentVerification,
+                                    isEntitled = isEntitled,
+                                    onSubscribeMonthly = onSubscribeMonthly,
+                                    onPurchaseLifetime = onPurchaseLifetime,
+                                    onClearError = onClearSubscriptionError,
+                                    onRetrySync = onRetrySubscriptionSync,
+                                    onRetryPaymentVerification = onRetryPaymentVerification,
+                                    onOpenHomeSettings = onOpenHomeSettings,
+                                    onProceedToLauncherSetup = {
+                                        coroutineScope.launch {
+                                            if (pagerState.currentPage < steps.size - 1) {
+                                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                            }
+                                        }
+                                    },
+                                    onCompleteOnboarding = {
+                                        coroutineScope.launch {
+                                            if (pagerState.currentPage < steps.size - 1) {
+                                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                            }
+                                        }
+                                    }
                                 )
                             }
                         }
+
+                        OnboardingStep.DEFAULT_LAUNCHER -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 24.dp)
+                                    .padding(top = 40.dp, bottom = 120.dp)
+                            ) {
+                                OnboardingDefaultLauncherScreen(
+                                    isDefaultLauncher = isDefaultLauncher,
+                                    onSetDefaultLauncher = onSetDefaultLauncher
+                                )
+                            }
+                        }
+
+                        OnboardingStep.ALL_SET -> {
+                            OnboardingAllSetScreen(
+                                onLetsGo = onCompleteOnboarding
+                            )
+                        }
                     }
+                }
 
-                    3 -> {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            if (isDefaultLauncher) {
-                                Button(
-                                    onClick = onCompleteOnboarding,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        contentColor = MaterialTheme.colorScheme.onPrimary
-                                    ),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(52.dp)
+                // Bottom Actions & Navigation (for EXPLAIN and DEFAULT_LAUNCHER)
+                val currentStep = steps.getOrNull(pagerState.currentPage)
+                if (currentStep == OnboardingStep.EXPLAIN || currentStep == OnboardingStep.DEFAULT_LAUNCHER) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 24.dp, vertical = 24.dp)
+                    ) {
+                        when (currentStep) {
+                            OnboardingStep.EXPLAIN -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = "Get Started",
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                                    )
-                                }
-                            } else {
-                                Button(
-                                    onClick = onSetDefaultLauncher,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        contentColor = MaterialTheme.colorScheme.onPrimary
-                                    ),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(52.dp)
-                                ) {
-                                    Text(
-                                        text = "Set as Default Launcher",
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                                    )
-                                }
+                                    TextButton(
+                                        onClick = {
+                                            onIntroCompleted()
+                                            coroutineScope.launch {
+                                                if (pagerState.currentPage < steps.size - 1) {
+                                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Text(
+                                            text = "Skip",
+                                            color = MaterialTheme.colorScheme.secondary,
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                    }
 
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                TextButton(
-                                    onClick = onCompleteOnboarding,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = "Continue without setting default",
-                                        color = MaterialTheme.colorScheme.secondary,
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
+                                    Button(
+                                        onClick = {
+                                            onIntroCompleted()
+                                            coroutineScope.launch {
+                                                if (pagerState.currentPage < steps.size - 1) {
+                                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                                }
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        ),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.height(48.dp)
+                                    ) {
+                                        Text(
+                                            text = "Next",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium)
+                                        )
+                                    }
                                 }
                             }
+
+                            OnboardingStep.DEFAULT_LAUNCHER -> {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    if (isDefaultLauncher) {
+                                        Button(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    if (pagerState.currentPage < steps.size - 1) {
+                                                        pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                                    }
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                            ),
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(52.dp)
+                                        ) {
+                                            Text(
+                                                text = "Continue",
+                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                                            )
+                                        }
+                                    } else {
+                                        Button(
+                                            onClick = onSetDefaultLauncher,
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                            ),
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(52.dp)
+                                        ) {
+                                            Text(
+                                                text = "Set as Default Launcher",
+                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        TextButton(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    if (pagerState.currentPage < steps.size - 1) {
+                                                        pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = "Continue without setting default",
+                                                color = MaterialTheme.colorScheme.secondary,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            else -> {}
                         }
                     }
                 }
@@ -352,7 +355,7 @@ fun OnboardingScreen(
 }
 
 /**
- * Screen 1 (Position 1): Redesigned "Continue with Google" onboarding screen.
+ * Screen 1: "Continue with Google" onboarding screen.
  */
 @Composable
 private fun OnboardingSignInScreen(
@@ -535,7 +538,7 @@ private fun OnboardingSignInScreen(
 }
 
 /**
- * Screen 2 (Position 2): Existing first onboarding screen ("Welcome to Unloop").
+ * Screen 2: "Welcome to Unloop" (marketing / feature explanation).
  */
 @Composable
 private fun OnboardingExplainAppScreen() {
@@ -623,7 +626,7 @@ private fun OnboardingExplainAppScreen() {
 }
 
 /**
- * Screen 4 (Position 4): Default launcher setup guide.
+ * Screen 3: Default launcher setup guide.
  */
 @Composable
 private fun OnboardingDefaultLauncherScreen(
@@ -655,7 +658,7 @@ private fun OnboardingDefaultLauncherScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = if (isDefaultLauncher) "STATUS: ACTIVE" else "FINAL STEP",
+                    text = if (isDefaultLauncher) "STATUS: ACTIVE" else "LAUNCHER SETUP",
                     style = MaterialTheme.typography.labelSmall.copy(
                         letterSpacing = 2.sp,
                         fontWeight = FontWeight.SemiBold
@@ -686,7 +689,7 @@ private fun OnboardingDefaultLauncherScreen(
 
                 Text(
                     text = if (isDefaultLauncher) {
-                        "Setup complete. Tap 'Get Started' to enter your new focused home screen."
+                        "Setup complete. Tap 'Continue' to finish setup."
                     } else {
                         "Tap the button below to open system settings and select Unloop as your default home app."
                     },
@@ -769,5 +772,101 @@ private fun InstructionStep(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground
         )
+    }
+}
+
+/**
+ * Final Onboarding Screen: "You're All Set!"
+ */
+@Composable
+private fun OnboardingAllSetScreen(
+    onLetsGo: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(top = 40.dp, bottom = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Spacer(modifier = Modifier.weight(1f))
+
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Text(
+                text = "READY",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                ),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        Text(
+            text = "You're All Set!",
+            style = MaterialTheme.typography.headlineLarge.copy(
+                fontWeight = FontWeight.Light,
+                fontSize = 32.sp
+            ),
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "Welcome to Unloop. Your journey to a calmer, more focused digital life starts right now.",
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = 16.sp,
+                lineHeight = 24.sp
+            ),
+            color = MaterialTheme.colorScheme.secondary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 12.dp)
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            text = "Start living more intentionally.",
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = 14.sp,
+                fontStyle = FontStyle.Italic
+            ),
+            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Button(
+            onClick = onLetsGo,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+        ) {
+            Text(
+                text = "Let's Go",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp
+                )
+            )
+        }
     }
 }

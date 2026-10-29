@@ -118,6 +118,7 @@ fun LauncherRoot(
             LauncherScreen.ONBOARDING -> {
                 OnboardingScreen(
                     isDefaultLauncher = isDefaultLauncher,
+                    isIntroCompleted = viewModel.isIntroCompleted(),
                     initialPage = viewModel.getInitialOnboardingPage(),
                     authState = authState,
                     isEntitled = isEntitled,
