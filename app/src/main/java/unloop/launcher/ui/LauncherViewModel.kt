@@ -1,5 +1,6 @@
 package unloop.launcher.ui
 
+import android.app.Activity
 import android.app.Application
 import android.app.admin.DevicePolicyManager
 import android.content.Context
@@ -10,6 +11,8 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.razorpay.Checkout
+import com.razorpay.PaymentData
 import unloop.launcher.auth.AuthRepository
 import unloop.launcher.auth.SessionValidationResult
 import unloop.launcher.auth.GoogleAuthCancellationException
@@ -21,6 +24,12 @@ import unloop.launcher.data.PreferencesManager
 import unloop.launcher.service.FilteredNotificationItem
 import unloop.launcher.service.NotificationManagerService
 import unloop.launcher.service.ShortVideoBlockerAccessibilityService
+import unloop.launcher.subscription.SubscriptionRepository
+import unloop.launcher.subscription.model.CheckoutIntent
+import unloop.launcher.subscription.model.EntitlementInfo
+import unloop.launcher.subscription.model.EntitlementState
+import unloop.launcher.subscription.model.SubscriptionPlan
+import unloop.launcher.subscription.payment.RazorpayCheckoutLauncher
 import unloop.launcher.util.AppSearchEngine
 import unloop.launcher.util.PermissionUtils
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +58,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val prefs = PreferencesManager.getInstance(application)
     private val repository = AppsRepository(application, prefs)
     private val authRepository = AuthRepository(prefs)
+    private val subscriptionRepository = SubscriptionRepository(application, prefs)
+
     val authSession: StateFlow<AuthSession?> = authRepository.authSessionFlow
     private val _authState = MutableStateFlow<AuthState>(
         if (authRepository.hasValidSession()) {
@@ -58,6 +69,20 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     )
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
+
+    // Subscription & Entitlement State
+    val isEntitled: StateFlow<Boolean> = subscriptionRepository.isEntitled
+    val entitlementState: StateFlow<EntitlementState> = subscriptionRepository.entitlementState
+    val subscriptionPlans: StateFlow<List<SubscriptionPlan>> = subscriptionRepository.cachedPlans
+
+    private val _isSubscriptionProcessing = MutableStateFlow(false)
+    val isSubscriptionProcessing: StateFlow<Boolean> = _isSubscriptionProcessing.asStateFlow()
+
+    private val _subscriptionErrorMessage = MutableStateFlow<String?>(null)
+    val subscriptionErrorMessage: StateFlow<String?> = _subscriptionErrorMessage.asStateFlow()
+
+    private var pendingMonthlyIntent: CheckoutIntent.Monthly? = null
+    private var pendingLifetimeIntent: CheckoutIntent.Lifetime? = null
 
     private val _currentScreen = MutableStateFlow(determineInitialScreen())
     val currentScreen: StateFlow<LauncherScreen> = _currentScreen.asStateFlow()
@@ -222,7 +247,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _isBatteryOptimizationIgnored.value = batteryIgnored
         _isUsageAccessGranted.value = usageGranted
 
-        // If permission was revoked outside the app, sync preference
         if (!accessibilityGranted && prefs.isShortVideoBlockerEnabled()) {
             prefs.setShortVideoBlockerEnabled(false)
         }
@@ -230,7 +254,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             prefs.setNotificationManagerEnabled(false)
         }
 
-        // Handle returning from system settings when user was prompted to enable a feature
         if (pendingEnableShortVideoBlocker) {
             if (accessibilityGranted) {
                 prefs.setShortVideoBlockerEnabled(true)
@@ -278,11 +301,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         PermissionUtils.requestIgnoreBatteryOptimization(context)
     }
 
-    /**
-     * Locks the device on double-tap gesture.
-     * Verifies system settings (respects OEM double tap to sleep/lock configurations)
-     * and uses the AccessibilityService GLOBAL_ACTION_LOCK_SCREEN to lock the screen.
-     */
     fun lockDevice(context: Context) {
         if (!PermissionUtils.isDoubleTapToLockEnabledInSystem(context)) {
             return
@@ -334,6 +352,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     init {
         refreshApps()
+        viewModelScope.launch {
+            subscriptionRepository.refreshPlans()
+        }
     }
 
     fun refreshApps() {
@@ -348,7 +369,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private var notificationSourceScreen: LauncherScreen = LauncherScreen.HOME
 
     fun navigateTo(screen: LauncherScreen) {
-        if (!authRepository.hasValidSession() && screen != LauncherScreen.ONBOARDING) {
+        if ((!authRepository.hasValidSession() || !subscriptionRepository.evaluateLocalEntitlement()) && screen != LauncherScreen.ONBOARDING) {
             _currentScreen.value = LauncherScreen.ONBOARDING
             return
         }
@@ -388,7 +409,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun handleAppClick(app: AppItem) {
-        // If Focus Mode is enabled and this app is in focus restricted list, show mindful pause
         if (prefs.isFocusModeEnabled() && prefs.getFocusApps().contains(app.packageName)) {
             _mindfulPromptApp.value = app
         } else {
@@ -453,9 +473,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         if (!authRepository.hasValidSession()) {
             return LauncherScreen.ONBOARDING
         }
+        val isEntitled = subscriptionRepository.evaluateLocalEntitlement()
+        if (!isEntitled) {
+            return LauncherScreen.ONBOARDING
+        }
         val isDefault = checkIfDefaultLauncher()
         val isIntroDone = prefs.isIntroCompleted()
-        // If user hasn't seen the intro, or hasn't finished setting default launcher, show onboarding
         return if (!isIntroDone || !isDefault) {
             LauncherScreen.ONBOARDING
         } else {
@@ -464,12 +487,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getInitialOnboardingPage(): Int {
-        // If user already passed the intro explanations (screens 1 & 2) but launcher setup is pending,
-        // take them directly to screen 3 (index 2) so they aren't forced to re-read the intro.
         if (!authRepository.hasValidSession()) {
             return 0
         }
-        return if (prefs.isIntroCompleted() && !checkIfDefaultLauncher()) 2 else 1
+        val isEntitled = subscriptionRepository.evaluateLocalEntitlement()
+        if (!isEntitled) {
+            return 2 // Subscription Onboarding Screen
+        }
+        return if (prefs.isIntroCompleted() && !checkIfDefaultLauncher()) 3 else 1
     }
 
     fun markIntroCompleted() {
@@ -477,7 +502,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun completeOnboarding() {
-        if (!authRepository.hasValidSession()) {
+        if (!authRepository.hasValidSession() || !subscriptionRepository.evaluateLocalEntitlement()) {
             _currentScreen.value = LauncherScreen.ONBOARDING
             return
         }
@@ -489,9 +514,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun checkDefaultStatus() {
         val isDefault = checkIfDefaultLauncher()
         _isDefaultLauncher.value = isDefault
-        if (isDefault && authRepository.hasValidSession()) {
+        if (isDefault && authRepository.hasValidSession() && subscriptionRepository.evaluateLocalEntitlement()) {
             prefs.setOnboardingCompleted(true)
-            // If user was on onboarding and just completed default launcher setup, proceed to Home
             if (_currentScreen.value == LauncherScreen.ONBOARDING) {
                 _currentScreen.value = LauncherScreen.HOME
             }
@@ -541,15 +565,18 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             } catch (_: Exception) {}
         }
     }
+
     init {
         viewModelScope.launch {
             authSession.collect { session ->
                 if (session != null) {
                     _authState.value = AuthState.Authenticated(session)
+                    subscriptionRepository.onUserLoggedIn()
                 } else {
                     if (_authState.value is AuthState.Authenticated) {
                         _authState.value = AuthState.Idle
                     }
+                    subscriptionRepository.onUserLoggedOut()
                     if (_currentScreen.value != LauncherScreen.ONBOARDING) {
                         _currentScreen.value = LauncherScreen.ONBOARDING
                     }
@@ -566,6 +593,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             if (result is SessionValidationResult.Invalid) {
                 _authState.value = AuthState.Error(result.reason)
                 _currentScreen.value = LauncherScreen.ONBOARDING
+            } else {
+                subscriptionRepository.synchronizeEntitlement(forceServerCheck = false)
             }
         }
     }
@@ -578,6 +607,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             result.fold(
                 onSuccess = { session ->
                     _authState.value = AuthState.Authenticated(session)
+                    subscriptionRepository.onUserLoggedIn()
                 },
                 onFailure = { error ->
                     if (error is GoogleAuthCancellationException) {
@@ -599,6 +629,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun logout() {
         authRepository.logout()
+        subscriptionRepository.onUserLoggedOut()
         _authState.value = AuthState.Idle
         _currentScreen.value = LauncherScreen.ONBOARDING
     }
@@ -609,6 +640,141 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             AuthState.Authenticated(currentSession)
         } else {
             AuthState.Idle
+        }
+    }
+
+    // --- Subscription & Payment Actions ---
+
+    fun subscribeMonthly(activity: Activity) {
+        if (_isSubscriptionProcessing.value) return
+        _isSubscriptionProcessing.value = true
+        _subscriptionErrorMessage.value = null
+
+        viewModelScope.launch {
+            val result = subscriptionRepository.initiateMonthlySubscription()
+            result.fold(
+                onSuccess = { monthlyIntent ->
+                    pendingMonthlyIntent = monthlyIntent
+                    pendingLifetimeIntent = null
+                    val email = prefs.getAuthSession()?.user?.email ?: ""
+                    val launched = RazorpayCheckoutLauncher.openSubscriptionCheckout(activity, monthlyIntent, email)
+                    if (!launched) {
+                        _isSubscriptionProcessing.value = false
+                        _subscriptionErrorMessage.value = "Unable to start Razorpay checkout. Please check connection."
+                    }
+                },
+                onFailure = { error ->
+                    _isSubscriptionProcessing.value = false
+                    _subscriptionErrorMessage.value = error.message ?: "Failed to initiate monthly subscription"
+                }
+            )
+        }
+    }
+
+    fun purchaseLifetime(activity: Activity) {
+        if (_isSubscriptionProcessing.value) return
+        _isSubscriptionProcessing.value = true
+        _subscriptionErrorMessage.value = null
+
+        viewModelScope.launch {
+            val result = subscriptionRepository.initiateLifetimePurchase()
+            result.fold(
+                onSuccess = { lifetimeIntent ->
+                    pendingLifetimeIntent = lifetimeIntent
+                    pendingMonthlyIntent = null
+                    val email = prefs.getAuthSession()?.user?.email ?: ""
+                    val launched = RazorpayCheckoutLauncher.openLifetimeCheckout(activity, lifetimeIntent, email)
+                    if (!launched) {
+                        _isSubscriptionProcessing.value = false
+                        _subscriptionErrorMessage.value = "Unable to start Razorpay checkout. Please check connection."
+                    }
+                },
+                onFailure = { error ->
+                    _isSubscriptionProcessing.value = false
+                    _subscriptionErrorMessage.value = error.message ?: "Failed to initiate lifetime purchase"
+                }
+            )
+        }
+    }
+
+    fun handleRazorpaySuccess(paymentId: String?, paymentData: PaymentData?) {
+        _isSubscriptionProcessing.value = true
+        _subscriptionErrorMessage.value = null
+
+        viewModelScope.launch {
+            val pid = paymentId ?: paymentData?.paymentId ?: ""
+            val signature = paymentData?.signature ?: ""
+
+            val subIdFromPayload = paymentData?.data?.optString("razorpay_subscription_id")
+            val isMonthly = pendingMonthlyIntent != null || !subIdFromPayload.isNullOrBlank()
+            val subscriptionId = if (!subIdFromPayload.isNullOrBlank()) subIdFromPayload else (pendingMonthlyIntent?.subscriptionId ?: "")
+
+            val orderIdFromPayload = paymentData?.data?.optString("razorpay_order_id")
+            val orderId = if (!orderIdFromPayload.isNullOrBlank()) orderIdFromPayload else (pendingLifetimeIntent?.orderId ?: "")
+
+            if (isMonthly && subscriptionId.isNotBlank()) {
+                val verifyResult = subscriptionRepository.verifyMonthlySubscription(pid, subscriptionId, signature)
+                verifyResult.fold(
+                    onSuccess = {
+                        _isSubscriptionProcessing.value = false
+                        pendingMonthlyIntent = null
+                        // Entitlement updated, onboarding gate passed!
+                    },
+                    onFailure = { error ->
+                        _isSubscriptionProcessing.value = false
+                        _subscriptionErrorMessage.value = "Server verification: ${error.message}. Please retry."
+                    }
+                )
+            } else if (orderId.isNotBlank()) {
+                val verifyResult = subscriptionRepository.verifyLifetimePayment(pid, orderId, signature)
+                verifyResult.fold(
+                    onSuccess = {
+                        _isSubscriptionProcessing.value = false
+                        pendingLifetimeIntent = null
+                    },
+                    onFailure = { error ->
+                        _isSubscriptionProcessing.value = false
+                        _subscriptionErrorMessage.value = "Server verification: ${error.message}. Please retry."
+                    }
+                )
+            } else {
+                _isSubscriptionProcessing.value = false
+                _subscriptionErrorMessage.value = "Verifying latest status with server..."
+                subscriptionRepository.synchronizeEntitlement(forceServerCheck = true)
+            }
+        }
+    }
+
+    fun handleRazorpayError(errorCode: Int, response: String?, paymentData: PaymentData?) {
+        _isSubscriptionProcessing.value = false
+        pendingMonthlyIntent = null
+        pendingLifetimeIntent = null
+        val message = if (errorCode == Checkout.PAYMENT_CANCELED) {
+            "Payment cancelled. You can retry when ready."
+        } else {
+            response?.ifBlank { null } ?: "Payment could not be completed (Error $errorCode). Please retry."
+        }
+        _subscriptionErrorMessage.value = message
+    }
+
+    fun clearSubscriptionError() {
+        _subscriptionErrorMessage.value = null
+    }
+
+    fun retrySubscriptionSync() {
+        _isSubscriptionProcessing.value = true
+        _subscriptionErrorMessage.value = null
+        viewModelScope.launch {
+            subscriptionRepository.synchronizeEntitlement(forceServerCheck = true)
+            _isSubscriptionProcessing.value = false
+        }
+    }
+
+    fun cancelMonthlySubscription() {
+        _isSubscriptionProcessing.value = true
+        viewModelScope.launch {
+            subscriptionRepository.cancelMonthlySubscription()
+            _isSubscriptionProcessing.value = false
         }
     }
 }

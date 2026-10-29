@@ -13,6 +13,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import com.razorpay.PaymentData
+import com.razorpay.PaymentResultWithDataListener
+import unloop.launcher.subscription.payment.RazorpayCheckoutLauncher
+import unloop.launcher.subscription.worker.SubscriptionSyncWorker
 import unloop.launcher.ui.LauncherScreen
 import unloop.launcher.ui.LauncherViewModel
 import unloop.launcher.ui.screens.AboutScreen
@@ -29,13 +33,17 @@ import unloop.launcher.ui.screens.OnboardingScreen
 import unloop.launcher.ui.screens.SettingsScreen
 import unloop.launcher.ui.theme.UnloopTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
 
     private val viewModel: LauncherViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Preload Razorpay checkout resources and schedule background synchronization
+        RazorpayCheckoutLauncher.preload(this)
+        SubscriptionSyncWorker.schedulePeriodicSync(this)
 
         setContent {
             val themeMode by viewModel.themeMode.collectAsState()
@@ -58,6 +66,14 @@ class MainActivity : ComponentActivity() {
         viewModel.refreshApps()
         viewModel.checkDefaultStatus()
         viewModel.checkPermissions()
+    }
+
+    override fun onPaymentSuccess(razorpayPaymentId: String?, paymentData: PaymentData?) {
+        viewModel.handleRazorpaySuccess(razorpayPaymentId, paymentData)
+    }
+
+    override fun onPaymentError(errorCode: Int, response: String?, paymentData: PaymentData?) {
+        viewModel.handleRazorpayError(errorCode, response, paymentData)
     }
 }
 
@@ -89,6 +105,13 @@ fun LauncherRoot(
     val showSystemAppsCleanup by viewModel.showSystemAppsCleanup.collectAsState()
     val authState by viewModel.authState.collectAsState()
 
+    // Subscription & Entitlement State
+    val isEntitled by viewModel.isEntitled.collectAsState()
+    val subscriptionPlans by viewModel.subscriptionPlans.collectAsState()
+    val isSubscriptionProcessing by viewModel.isSubscriptionProcessing.collectAsState()
+    val subscriptionErrorMessage by viewModel.subscriptionErrorMessage.collectAsState()
+    val entitlementState by viewModel.entitlementState.collectAsState()
+
     Crossfade(targetState = currentScreen, label = "ScreenTransition") { screen ->
         when (screen) {
             LauncherScreen.ONBOARDING -> {
@@ -96,8 +119,16 @@ fun LauncherRoot(
                     isDefaultLauncher = isDefaultLauncher,
                     initialPage = viewModel.getInitialOnboardingPage(),
                     authState = authState,
+                    isEntitled = isEntitled,
+                    plans = subscriptionPlans,
+                    isSubscriptionProcessing = isSubscriptionProcessing,
+                    subscriptionErrorMessage = subscriptionErrorMessage,
                     onContinueWithGoogle = { viewModel.loginWithGoogle(activity) },
                     onDismissAuthError = { viewModel.dismissAuthError() },
+                    onSubscribeMonthly = { viewModel.subscribeMonthly(activity) },
+                    onPurchaseLifetime = { viewModel.purchaseLifetime(activity) },
+                    onClearSubscriptionError = { viewModel.clearSubscriptionError() },
+                    onRetrySubscriptionSync = { viewModel.retrySubscriptionSync() },
                     onSetDefaultLauncher = { viewModel.openSetDefaultLauncher(activity) },
                     onCompleteOnboarding = { viewModel.completeOnboarding() },
                     onIntroCompleted = { viewModel.markIntroCompleted() }
@@ -207,8 +238,11 @@ fun LauncherRoot(
             LauncherScreen.ACCOUNT -> {
                 AccountScreen(
                     authState = authState,
+                    entitlementState = entitlementState,
                     onLoginClick = { viewModel.loginWithGoogle(activity) },
                     onLogoutClick = { viewModel.logout() },
+                    onCancelMonthlySubscription = { viewModel.cancelMonthlySubscription() },
+                    onUpgradeClick = { viewModel.navigateTo(LauncherScreen.ONBOARDING) },
                     onDismissError = { viewModel.dismissAuthError() },
                     onBack = { viewModel.navigateTo(LauncherScreen.SETTINGS) }
                 )

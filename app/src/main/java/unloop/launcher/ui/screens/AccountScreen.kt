@@ -1,6 +1,7 @@
 package unloop.launcher.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -22,32 +23,44 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import unloop.launcher.auth.model.AuthState
+import unloop.launcher.subscription.model.EntitlementState
+import unloop.launcher.subscription.model.PricingHelper
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun AccountScreen(
     authState: AuthState,
+    entitlementState: EntitlementState = EntitlementState.Loading,
     onLoginClick: () -> Unit,
     onLogoutClick: () -> Unit,
+    onCancelMonthlySubscription: () -> Unit = {},
+    onUpgradeClick: () -> Unit = {},
     onDismissError: () -> Unit,
     onBack: () -> Unit
 ) {
     BackHandler(onBack = onBack)
+
+    var showCancelConfirmDialog by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -105,7 +118,6 @@ fun AccountScreen(
                             .padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // User Avatar Initial Circle
                         Box(
                             modifier = Modifier
                                 .size(72.dp)
@@ -161,6 +173,144 @@ fun AccountScreen(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Subscription & Entitlement Section
+                    Text(
+                        text = "Subscription & Membership",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            when (entitlementState) {
+                                is EntitlementState.Entitled -> {
+                                    val ent = entitlementState.info
+                                    val isLifetime = ent.isLifetime
+                                    val isCancelled = ent.status == "cancelled"
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = if (isLifetime) "Lifetime Premium" else "Monthly Premium",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onBackground
+                                        )
+
+                                        Surface(
+                                            color = if (isCancelled) Color(0xFFF97316).copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary,
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text(
+                                                text = if (isCancelled) "Cancelled" else "Active",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = if (isCancelled) Color(0xFFF97316) else MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    if (isLifetime) {
+                                        Text(
+                                            text = "Permanent lifetime access active on this account.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                    } else {
+                                        val dateFmt = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+                                        val dateStr = if (ent.expiresAt != null) {
+                                            dateFmt.format(Date(ent.expiresAt))
+                                        } else {
+                                            "End of cycle"
+                                        }
+
+                                        if (isCancelled) {
+                                            Text(
+                                                text = "Your subscription was cancelled. Full access remains active until $dateStr.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.secondary
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "Renews automatically via UPI AutoPay on $dateStr (₹99/month).",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.secondary
+                                            )
+
+                                            Spacer(modifier = Modifier.height(14.dp))
+
+                                            OutlinedButton(
+                                                onClick = { showCancelConfirmDialog = true },
+                                                shape = RoundedCornerShape(10.dp),
+                                                modifier = Modifier.height(40.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Cancel Monthly Subscription",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.error
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                is EntitlementState.NotEntitled -> {
+                                    Text(
+                                        text = "No Active Subscription",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "Subscribe to Monthly or Lifetime to unlock full distraction-free launcher features.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Button(
+                                        onClick = onUpgradeClick,
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        ),
+                                        modifier = Modifier.height(42.dp)
+                                    ) {
+                                        Text(
+                                            text = "Upgrade to Premium",
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+                                        )
+                                    }
+                                }
+
+                                EntitlementState.Loading -> {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = "Verifying entitlement status...",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(24.dp))
 
                     OutlinedButton(
@@ -199,161 +349,92 @@ fun AccountScreen(
                 }
 
                 is AuthState.Error -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .background(
-                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.08f),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .padding(16.dp)
+                    Surface(
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = "Sign-in Failed",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = authState.message,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            TextButton(onClick = onDismissError) {
-                                Text(
-                                    text = "Dismiss",
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(
-                                onClick = onLoginClick,
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text(text = "Try Again")
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Authentication Error",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = authState.message,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = onLoginClick,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                ) {
+                                    Text("Retry Sign In")
+                                }
+                                TextButton(onClick = onDismissError) {
+                                    Text("Dismiss")
+                                }
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-                    GoogleSignInBanner(onLoginClick = onLoginClick)
                 }
 
                 AuthState.Idle -> {
-                    GoogleSignInBanner(onLoginClick = onLoginClick)
+                    Button(
+                        onClick = onLoginClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Text(
+                            text = "Sign in with Google",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                        )
+                    }
                 }
             }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Security note
-            Text(
-                text = "Privacy & Security",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Unloop uses Android Credential Manager to sign in directly with Google. Your launcher settings, notifications, and usage metrics remain stored locally on your device.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 20.sp
-            )
         }
     }
-}
 
-@Composable
-private fun GoogleSignInBanner(
-    onLoginClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Welcome to Unloop",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Sign in to keep your account connected and access upcoming features across devices.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-        // Sign In with Google Button
-        Surface(
-            onClick = onLoginClick,
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                // Monochrome Google "G" Badge
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
-                    contentAlignment = Alignment.Center
+    if (showCancelConfirmDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showCancelConfirmDialog = false },
+            title = { Text("Cancel Monthly Subscription?") },
+            text = {
+                Text("Your automatic monthly UPI AutoPay mandate will be stopped. You will keep full access to Unloop until the end of your current paid billing period.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCancelConfirmDialog = false
+                        onCancelMonthlySubscription()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
                 ) {
-                    Text(
-                        text = "G",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    )
+                    Text("Confirm Cancellation")
                 }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Text(
-                    text = "Sign in with Google",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                )
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelConfirmDialog = false }) {
+                    Text("Keep Subscription")
+                }
             }
-        }
+        )
     }
 }

@@ -48,19 +48,28 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import unloop.launcher.R
 import unloop.launcher.auth.model.AuthState
+import unloop.launcher.subscription.model.SubscriptionPlan
 
 @Composable
 fun OnboardingScreen(
     isDefaultLauncher: Boolean,
     initialPage: Int = 0,
     authState: AuthState = AuthState.Idle,
+    isEntitled: Boolean = false,
+    plans: List<SubscriptionPlan> = emptyList(),
+    isSubscriptionProcessing: Boolean = false,
+    subscriptionErrorMessage: String? = null,
     onContinueWithGoogle: () -> Unit,
     onDismissAuthError: () -> Unit = {},
+    onSubscribeMonthly: () -> Unit = {},
+    onPurchaseLifetime: () -> Unit = {},
+    onClearSubscriptionError: () -> Unit = {},
+    onRetrySubscriptionSync: () -> Unit = {},
     onSetDefaultLauncher: () -> Unit,
     onCompleteOnboarding: () -> Unit,
     onIntroCompleted: () -> Unit
 ) {
-    val pageCount = 3
+    val pageCount = 4
     val pagerState = rememberPagerState(
         initialPage = initialPage.coerceIn(0, pageCount - 1)
     ) { pageCount }
@@ -74,9 +83,16 @@ fun OnboardingScreen(
         }
     }
 
-    // Mark intro completed as soon as user navigates to the default launcher setup screen (page 2) with valid auth
-    LaunchedEffect(pagerState.currentPage, isAuthenticated) {
-        if (pagerState.currentPage >= 2 && isAuthenticated) {
+    // Auto-advance to Page 3 (Default Launcher) as soon as user becomes entitled on Page 2
+    LaunchedEffect(isEntitled, pagerState.currentPage) {
+        if (isEntitled && pagerState.currentPage == 2) {
+            pagerState.animateScrollToPage(3)
+        }
+    }
+
+    // Mark intro completed as soon as user navigates to the default launcher setup screen (page 3) with valid auth and entitlement
+    LaunchedEffect(pagerState.currentPage, isAuthenticated, isEntitled) {
+        if (pagerState.currentPage >= 3 && isAuthenticated && isEntitled) {
             onIntroCompleted()
         }
     }
@@ -86,13 +102,18 @@ fun OnboardingScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Main Pager with 3 screens:
-        // Page 0: Redesigned "Continue with Google" screen with full-bleed background image
-        // Page 1: "Welcome to Unloop" (Explain App)
-        // Page 2: "Set as Default Launcher"
+        // Main Pager with 4 screens:
+        // Page 0: "Continue with Google"
+        // Page 1: "Welcome to Unloop" (Marketing / App Explanation)
+        // Page 2: NEW "Subscription & Payment" Onboarding Screen
+        // Page 3: "Set as Default Launcher"
         HorizontalPager(
             state = pagerState,
-            userScrollEnabled = pagerState.currentPage != 0 || isAuthenticated,
+            userScrollEnabled = when (pagerState.currentPage) {
+                0 -> false
+                2 -> isEntitled // Gate: Cannot swipe past subscription until entitled
+                else -> true
+            },
             modifier = Modifier.fillMaxSize()
         ) { page ->
             when (page) {
@@ -125,11 +146,55 @@ fun OnboardingScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(horizontal = 24.dp)
+                                .padding(top = 70.dp, bottom = 24.dp)
+                        ) {
+                            OnboardingSubscriptionScreen(
+                                plans = plans,
+                                isProcessing = isSubscriptionProcessing,
+                                errorMessage = subscriptionErrorMessage,
+                                onSubscribeMonthly = onSubscribeMonthly,
+                                onPurchaseLifetime = onPurchaseLifetime,
+                                onClearError = onClearSubscriptionError,
+                                onRetrySync = onRetrySubscriptionSync
+                            )
+                        }
+                    } else {
+                        OnboardingSignInScreen(
+                            authState = authState,
+                            onContinueWithGoogle = onContinueWithGoogle
+                        )
+                    }
+                }
+
+                3 -> {
+                    if (isAuthenticated && isEntitled) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 24.dp)
                                 .padding(top = 80.dp, bottom = 120.dp)
                         ) {
                             OnboardingDefaultLauncherScreen(
                                 isDefaultLauncher = isDefaultLauncher,
                                 onSetDefaultLauncher = onSetDefaultLauncher
+                            )
+                        }
+                    } else if (isAuthenticated) {
+                        // Redirect to subscription gate
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 24.dp)
+                                .padding(top = 70.dp, bottom = 24.dp)
+                        ) {
+                            OnboardingSubscriptionScreen(
+                                plans = plans,
+                                isProcessing = isSubscriptionProcessing,
+                                errorMessage = subscriptionErrorMessage,
+                                onSubscribeMonthly = onSubscribeMonthly,
+                                onPurchaseLifetime = onPurchaseLifetime,
+                                onClearError = onClearSubscriptionError,
+                                onRetrySync = onRetrySubscriptionSync
                             )
                         }
                     } else {
@@ -177,8 +242,8 @@ fun OnboardingScreen(
             }
         }
 
-        // Bottom Actions & Navigation (for Pages 1 and 2)
-        if (pagerState.currentPage > 0) {
+        // Bottom Actions & Navigation (for Page 1 and Page 3)
+        if (pagerState.currentPage == 1 || pagerState.currentPage == 3) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -228,8 +293,8 @@ fun OnboardingScreen(
                         }
                     }
 
-                    2 -> {
-                        if (isAuthenticated) {
+                    3 -> {
+                        if (isAuthenticated && isEntitled) {
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalAlignment = Alignment.CenterHorizontally
@@ -300,7 +365,6 @@ private fun OnboardingSignInScreen(
     onContinueWithGoogle: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // Full-bleed Background Image
         Image(
             painter = painterResource(id = R.drawable.onboarding_bg),
             contentDescription = null,
@@ -308,7 +372,6 @@ private fun OnboardingSignInScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Gradient overlay for contrast and legibility
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -323,7 +386,6 @@ private fun OnboardingSignInScreen(
                 )
         )
 
-        // Screen content
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -335,7 +397,6 @@ private fun OnboardingSignInScreen(
         ) {
             Spacer(modifier = Modifier.weight(1f))
 
-            // Center: ONLY the "Unloop" text is in the center
             Text(
                 text = "Unloop",
                 style = MaterialTheme.typography.displayMedium.copy(
@@ -349,7 +410,6 @@ private fun OnboardingSignInScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Bottom Section: Headline, Subtitle, Primary Button, and Terms
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -412,7 +472,6 @@ private fun OnboardingSignInScreen(
 
                 val isLoading = authState is AuthState.Loading || authState is AuthState.Authenticated
 
-                // Primary Button: "Continue with Google"
                 Surface(
                     onClick = {
                         if (!isLoading) onContinueWithGoogle()
@@ -465,7 +524,6 @@ private fun OnboardingSignInScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Bottom disclaimer
                 Text(
                     text = "By continuing, you agree to our Terms and Conditions and Privacy Policy.",
                     style = MaterialTheme.typography.bodySmall.copy(
@@ -493,7 +551,6 @@ private fun OnboardingExplainAppScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Minimalist Visual Symbol
         Box(
             modifier = Modifier
                 .border(
@@ -571,7 +628,7 @@ private fun OnboardingExplainAppScreen() {
 }
 
 /**
- * Screen 3 (Position 3): Default launcher setup guide.
+ * Screen 4 (Position 4): Default launcher setup guide.
  */
 @Composable
 private fun OnboardingDefaultLauncherScreen(
@@ -585,7 +642,6 @@ private fun OnboardingDefaultLauncherScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Status Card
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
             shape = RoundedCornerShape(16.dp),
@@ -671,7 +727,6 @@ private fun OnboardingDefaultLauncherScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Instructions list
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
