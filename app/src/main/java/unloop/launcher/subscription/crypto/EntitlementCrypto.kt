@@ -1,6 +1,5 @@
 package unloop.launcher.subscription.crypto
 
-import android.util.Base64
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.math.BigInteger
@@ -9,6 +8,7 @@ import java.security.KeyFactory
 import java.security.PublicKey
 import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
+import java.util.Base64
 
 data class VerifiedEntitlement(
     val userId: String,
@@ -38,7 +38,7 @@ object EntitlementCrypto {
         "FcgawhHowwPHR4kLJz/U1gcYtXlgJP7aa04DJEpA/F97ZtDw4ba9JacBjA=="
 
     private val publicKey: PublicKey by lazy {
-        val keyBytes = Base64.decode(PUBLIC_KEY_SPKI_BASE64, Base64.DEFAULT)
+        val keyBytes = Base64.getDecoder().decode(PUBLIC_KEY_SPKI_BASE64)
         val spec = X509EncodedKeySpec(keyBytes)
         val keyFactory = KeyFactory.getInstance("EC")
         keyFactory.generatePublic(spec)
@@ -191,6 +191,6 @@ object EntitlementCrypto {
         val remainder = str.length % 4
         if (remainder == 2) str += "=="
         else if (remainder == 3) str += "="
-        return Base64.decode(str, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+        return Base64.getUrlDecoder().decode(str)
     }
 }
