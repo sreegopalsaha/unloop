@@ -37,7 +37,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import unloop.launcher.ui.components.HeaderActionType
 import unloop.launcher.ui.components.PermissionRationaleDialog
+import unloop.launcher.ui.components.ScreenHeader
 import unloop.launcher.auth.model.AuthState
 import unloop.launcher.util.AppVersionUtils
 
@@ -88,128 +90,52 @@ fun SettingsScreen(
                 .padding(top = 16.dp, bottom = 24.dp)
         ) {
             // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-
-                TextButton(onClick = onBackToHome) {
-                    Text(
-                        text = "Done",
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-            }
+            ScreenHeader(
+                title = "Settings",
+                onActionClick = onBackToHome,
+                actionType = HeaderActionType.DONE
+            )
 
             Spacer(modifier = Modifier.height(28.dp))
-
-            // --- SECTION: LAUNCHER ---
-            SectionHeader(title = "LAUNCHER")
-
-            SettingItem(
-                title = "Default launcher",
-                subtitle = "Set Unloop as your default launcher",
-                trailing = {
-                    Text(
-                        text = if (isDefaultLauncher) "Default" else "Configure",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (isDefaultLauncher) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
-                    )
-                },
-                onClick = onSetDefaultLauncher
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-            val appearanceLabel = themeMode.lowercase().replaceFirstChar { it.titlecase() }
-            SettingItem(
-                title = "Appearance: $appearanceLabel",
-                subtitle = "Tap to choose light, dark, or system theme",
-                onClick = {
-                    val nextMode = when (themeMode) {
-                        "DARK" -> "LIGHT"
-                        "LIGHT" -> "SYSTEM"
-                        else -> "DARK"
-                    }
-                    onChangeTheme(nextMode)
-                }
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-            SettingItem(
-                title = "Hidden apps",
-                subtitle = "Manage and open hidden apps",
-                onClick = onOpenHiddenApps
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-            SettingItem(
-                title = "App cleanup",
-                subtitle = "Categorize apps and clean up unused apps",
-                onClick = onOpenAppCleanup
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
 
             // --- SECTION: DIGITAL WELLBEING ---
             SectionHeader(title = "DIGITAL WELLBEING")
 
             // 1. Focus Mode
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenFocusSettings)
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Focus mode",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Choose apps to pause during focus mode",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.padding(horizontal = 8.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Switch(
-                        checked = focusModeEnabled,
-                        onCheckedChange = onToggleFocusMode,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.background,
-                            checkedTrackColor = MaterialTheme.colorScheme.primary
-                        )
-                    )
+            SettingItem(
+                title = "Focus mode",
+                subtitle = "Pause distracting apps so you can focus",
+                trailing = {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.size(20.dp)
                     )
-                }
-            }
+                },
+                onClick = onOpenFocusSettings
+            )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
-            // 2. Short-Video Blocker
+            // 2. Notification Manager
+            SettingItem(
+                title = "Notification manager",
+                subtitle = "View your notifications",
+                trailing = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onClick = onOpenNotifications
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+            // 3. Short-Video Blocker
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -225,7 +151,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Block Reels, Shorts, and Spotlight",
+                        text = "Block distracting short videos and scroll less",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -247,60 +173,10 @@ fun SettingsScreen(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
-            // 3. Notification Manager
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenNotifications)
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Notification manager",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Manage muted apps and view notifications",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.padding(horizontal = 8.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Switch(
-                        checked = notificationManagerEnabled,
-                        onCheckedChange = { targetState ->
-                            onToggleNotificationManager(targetState) {
-                                showNotificationDialog = true
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.background,
-                            checkedTrackColor = MaterialTheme.colorScheme.primary
-                        )
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-            // 4. Screen time statistics
+            // 4. Screen time
             SettingItem(
                 title = "Screen time",
-                subtitle = "View app usage and daily screen time",
+                subtitle = "See how much time you spend on your phone",
                 trailing = {
                     Text(
                         text = "Open",
@@ -313,16 +189,68 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // --- SECTION: ACCOUNT ---
-            SectionHeader(title = "ACCOUNT")
+            // --- SECTION: APPS ---
+            SectionHeader(title = "APPS")
 
-            val accountSubtitle = when (authState) {
-                is AuthState.Authenticated -> authState.session.user.email
-                is AuthState.Loading -> "Signing in..."
-                is AuthState.Error -> "Sign-in error - tap to view"
-                AuthState.Idle -> "Sign in with Google"
-            }
+            // Hidden apps
+            SettingItem(
+                title = "Hidden apps",
+                subtitle = "Manage your hidden apps",
+                onClick = onOpenHiddenApps
+            )
 
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+            // App cleanup
+            SettingItem(
+                title = "App cleanup",
+                subtitle = "Clean up unnecessary apps",
+                onClick = onOpenAppCleanup
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // --- SECTION: GENERAL ---
+            SectionHeader(title = "GENERAL")
+
+            // Default launcher
+            SettingItem(
+                title = "Default launcher",
+                subtitle = if (isDefaultLauncher) {
+                    "Unloop is your default home screen"
+                } else {
+                    "Set Unloop as your default home screen"
+                },
+                trailing = {
+                    Text(
+                        text = if (isDefaultLauncher) "Default" else "Set up",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (isDefaultLauncher) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
+                    )
+                },
+                onClick = onSetDefaultLauncher
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+            // Appearance
+            val appearanceLabel = themeMode.lowercase().replaceFirstChar { it.titlecase() }
+            SettingItem(
+                title = "Appearance: $appearanceLabel",
+                subtitle = "Choose light, dark, or system theme",
+                onClick = {
+                    val nextMode = when (themeMode) {
+                        "DARK" -> "LIGHT"
+                        "LIGHT" -> "SYSTEM"
+                        else -> "DARK"
+                    }
+                    onChangeTheme(nextMode)
+                }
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+            // Account
             val accountTrailing = when (authState) {
                 is AuthState.Authenticated -> "Signed in"
                 is AuthState.Loading -> "..."
@@ -332,7 +260,7 @@ fun SettingsScreen(
 
             SettingItem(
                 title = "Account",
-                subtitle = accountSubtitle,
+                subtitle = "Manage your account and subscription",
                 trailing = {
                     Text(
                         text = accountTrailing,
@@ -343,14 +271,12 @@ fun SettingsScreen(
                 onClick = onOpenAccount
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
-            // --- SECTION: ABOUT ---
-            SectionHeader(title = "ABOUT")
-
+            // About Unloop
             SettingItem(
                 title = "About Unloop",
-                subtitle = "Version $appVersion",
+                subtitle = "App information and legal details",
                 onClick = onOpenAbout
             )
         }

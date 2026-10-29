@@ -112,30 +112,33 @@ fun HomeScreen(
 
             // Default Launcher Notice Banner if not default
             if (!isDefaultLauncher) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(28.dp))
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     modifier = Modifier
                         .fillMaxWidth()
                         .combinedClickable(onClick = onRequestSetDefault)
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+                    ) {
                         Text(
                             text = "Set Unloop as default launcher",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Tap here to enable minimalist focus experience.",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = "Tap here to start your focus journey.",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
+                Spacer(modifier = Modifier.height(28.dp))
+            } else {
+                Spacer(modifier = Modifier.height(36.dp))
             }
-
-            Spacer(modifier = Modifier.height(36.dp))
 
             // Favorites List
             if (favoriteApps.isEmpty()) {

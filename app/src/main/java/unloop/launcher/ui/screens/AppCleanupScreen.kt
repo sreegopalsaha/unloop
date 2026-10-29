@@ -48,6 +48,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import unloop.launcher.ui.components.HeaderActionType
+import unloop.launcher.ui.components.ScreenHeader
 import unloop.launcher.data.AppItem
 import unloop.launcher.ui.components.PermissionRationaleDialog
 import unloop.launcher.util.AppCleanupManager
@@ -125,25 +127,11 @@ fun AppCleanupScreen(
         ) {
             // Header: Title and Done button (consistent with SettingsScreen)
             item(key = "header") {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "App Cleanup",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-
-                    TextButton(onClick = onBack) {
-                        Text(
-                            text = "Done",
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                }
+                ScreenHeader(
+                    title = "App Cleanup",
+                    onActionClick = onBack,
+                    actionType = HeaderActionType.DONE
+                )
             }
 
             // Total App Counts Summary

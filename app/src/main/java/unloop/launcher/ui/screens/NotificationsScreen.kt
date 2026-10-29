@@ -42,7 +42,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import unloop.launcher.service.FilteredNotificationItem
+import unloop.launcher.ui.components.HeaderActionType
 import unloop.launcher.ui.components.PermissionRationaleDialog
+import unloop.launcher.ui.components.ScreenHeader
 
 @Composable
 fun NotificationsScreen(
@@ -79,25 +81,11 @@ fun NotificationsScreen(
                 .padding(top = 16.dp, bottom = 16.dp)
         ) {
             // Header: Title and Back button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Notifications",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-
-                TextButton(onClick = onBack) {
-                    Text(
-                        text = "Back",
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-            }
+            ScreenHeader(
+                title = "Notifications",
+                onActionClick = onBack,
+                actionType = HeaderActionType.BACK
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 

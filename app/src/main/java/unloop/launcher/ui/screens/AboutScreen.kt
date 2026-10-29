@@ -24,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import unloop.launcher.ui.components.HeaderActionType
+import unloop.launcher.ui.components.ScreenHeader
 import unloop.launcher.util.AppVersionUtils
 
 @Composable
@@ -51,25 +53,11 @@ fun AboutScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(top = 16.dp, bottom = 24.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "About",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-
-                TextButton(onClick = onBack) {
-                    Text(
-                        text = "Back",
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-            }
+            ScreenHeader(
+                title = "About",
+                onActionClick = onBack,
+                actionType = HeaderActionType.BACK
+            )
 
             Spacer(modifier = Modifier.height(28.dp))
 
