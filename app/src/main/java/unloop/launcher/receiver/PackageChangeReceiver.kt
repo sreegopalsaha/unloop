@@ -22,7 +22,7 @@ class PackageChangeReceiver : BroadcastReceiver() {
             AppCleanupManager.clearCache()
             AppIconCache.clear()
             val prefs = PreferencesManager.getInstance(context)
-            val repository = AppsRepository(context, prefs)
+            val repository = AppsRepository.getInstance(context, prefs)
             CoroutineScope(Dispatchers.IO).launch {
                 repository.refreshApps()
             }

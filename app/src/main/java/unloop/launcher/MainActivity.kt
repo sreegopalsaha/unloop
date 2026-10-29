@@ -268,7 +268,7 @@ fun LauncherRoot(
                     onToggleShowSystemApps = { viewModel.setShowSystemAppsCleanup(it) },
                     onOpenUsageSettings = { viewModel.openUsageAccessSettings(activity) },
                     onDismissUsageBanner = { viewModel.dismissUsageBanner() },
-                    onUninstallApp = { viewModel.openAppDetails(it) },
+                    onUninstallApp = { viewModel.uninstallApp(it) },
                     onOpenApp = { viewModel.handleAppClick(it) },
                     onBack = { viewModel.navigateTo(LauncherScreen.SETTINGS) }
                 )

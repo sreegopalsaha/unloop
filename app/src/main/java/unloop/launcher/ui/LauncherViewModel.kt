@@ -58,7 +58,7 @@ enum class LauncherScreen {
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = PreferencesManager.getInstance(application)
-    private val repository = AppsRepository(application, prefs)
+    private val repository = AppsRepository.getInstance(application, prefs)
     private val authRepository = AuthRepository(prefs)
     private val subscriptionRepository = SubscriptionRepository(application, prefs)
 
@@ -451,7 +451,31 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun uninstallApp(app: AppItem) {
-        repository.uninstallApp(app.packageName)
+        val context = getApplication<Application>()
+        if (app.packageName.isBlank()) {
+            Toast.makeText(context, "Invalid application package", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (app.packageName == context.packageName) {
+            Toast.makeText(context, "Cannot uninstall active launcher", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (app.isSystemApp || repository.isSystemApp(app.packageName)) {
+            Toast.makeText(
+                context,
+                "${app.label} is a system application and cannot be uninstalled",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        val started = repository.uninstallApp(app.packageName)
+        if (!started) {
+            Toast.makeText(
+                context,
+                "Unable to uninstall ${app.label}",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     fun setShortVideoBlockerEnabled(enabled: Boolean) {

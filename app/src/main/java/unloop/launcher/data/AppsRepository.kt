@@ -18,6 +18,20 @@ class AppsRepository(
     private val preferencesManager: PreferencesManager
 ) {
 
+    companion object {
+        @Volatile
+        private var instance: AppsRepository? = null
+
+        fun getInstance(context: Context, preferencesManager: PreferencesManager): AppsRepository {
+            return instance ?: synchronized(this) {
+                instance ?: AppsRepository(
+                    context.applicationContext,
+                    preferencesManager
+                ).also { instance = it }
+            }
+        }
+    }
+
     private val _appsFlow = MutableStateFlow<List<AppItem>>(emptyList())
     val appsFlow: StateFlow<List<AppItem>> = _appsFlow.asStateFlow()
 
@@ -85,6 +99,11 @@ class AppsRepository(
                 preferencesManager.setHiddenApps(hidden - deadHidden)
             }
 
+            val deadFocus = focusApps.filterNot { installedPackages.contains(it) }.toSet()
+            if (deadFocus.isNotEmpty()) {
+                preferencesManager.setFocusApps(focusApps - deadFocus)
+            }
+
             _appsFlow.value = items
         }
     }
@@ -114,14 +133,28 @@ class AppsRepository(
         } catch (_: Exception) {}
     }
 
-    fun uninstallApp(packageName: String) {
-        try {
-            val intent = Intent(Intent.ACTION_DELETE).apply {
-                data = android.net.Uri.parse("package:$packageName")
+    fun isSystemApp(packageName: String): Boolean {
+        return try {
+            val appInfo = context.packageManager.getApplicationInfo(packageName, 0)
+            (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 ||
+            (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun uninstallApp(packageName: String): Boolean {
+        return try {
+            val uri = android.net.Uri.fromParts("package", packageName, null)
+            val intent = Intent(Intent.ACTION_DELETE, uri).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
-        } catch (_: Exception) {}
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("AppsRepository", "Failed to launch uninstall intent for $packageName", e)
+            false
+        }
     }
 
     fun openPhone(): Boolean {
