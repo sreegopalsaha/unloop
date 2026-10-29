@@ -776,97 +776,83 @@ private fun InstructionStep(
 }
 
 /**
- * Final Onboarding Screen: "You're All Set!"
+ * Final Onboarding Screen: "You’re all set!"
  */
 @Composable
 private fun OnboardingAllSetScreen(
     onLetsGo: () -> Unit
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(top = 40.dp, bottom = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .background(Color.Black)
     ) {
-        Spacer(modifier = Modifier.weight(1f))
-
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            shape = RoundedCornerShape(20.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Text(
-                text = "READY",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                ),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-        Text(
-            text = "You're All Set!",
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontWeight = FontWeight.Light,
-                fontSize = 32.sp
-            ),
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center
+        Image(
+            painter = painterResource(id = R.drawable.onboarding_all_set_bg),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
+            modifier = Modifier.fillMaxSize()
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "Welcome to Unloop. Your journey to a calmer, more focused digital life starts right now.",
-            style = MaterialTheme.typography.bodyLarge.copy(
-                fontSize = 16.sp,
-                lineHeight = 24.sp
-            ),
-            color = MaterialTheme.colorScheme.secondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 12.dp)
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Text(
-            text = "Start living more intentionally.",
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 14.sp,
-                fontStyle = FontStyle.Italic
-            ),
-            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Button(
-            onClick = onLetsGo,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ),
-            shape = RoundedCornerShape(14.dp),
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp)
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Space above the text ensures the glowing checkmark graphic
+            // (centered in the upper-middle area) remains fully visible without overlap.
+            Spacer(modifier = Modifier.weight(1.15f))
+
             Text(
-                text = "Let's Go",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp
-                )
+                text = "You’re all set!",
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 32.sp,
+                    letterSpacing = (-0.5).sp
+                ),
+                color = Color.White,
+                textAlign = TextAlign.Center
             )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Welcome to a calmer, more focused phone experience.",
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = 16.sp,
+                    lineHeight = 24.sp
+                ),
+                color = Color.White.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            Spacer(modifier = Modifier.weight(0.85f))
+
+            Button(
+                onClick = onLetsGo,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = Color.Black
+                ),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+            ) {
+                Text(
+                    text = "Start Using Unloop",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp
+                    )
+                )
+            }
         }
     }
 }
