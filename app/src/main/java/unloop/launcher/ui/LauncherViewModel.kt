@@ -482,12 +482,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         if (!isEntitled) {
             return LauncherScreen.ONBOARDING
         }
-        // If onboarding has not been completed, check if default setup or intro is pending
+        // If onboarding has not been completed, stay in onboarding until the user completes the flow
         if (!prefs.isOnboardingCompleted()) {
-            if (checkIfDefaultLauncher() && prefs.isIntroCompleted()) {
-                prefs.setOnboardingCompleted(true)
-                return LauncherScreen.HOME
-            }
             return LauncherScreen.ONBOARDING
         }
         return LauncherScreen.HOME

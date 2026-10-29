@@ -39,10 +39,6 @@ class OnboardingFlowTest {
             return "ONBOARDING"
         }
         if (!prefsManager.isOnboardingCompleted()) {
-            if (isDefaultLauncher && prefsManager.isIntroCompleted()) {
-                prefsManager.setOnboardingCompleted(true)
-                return "HOME"
-            }
             return "ONBOARDING"
         }
         return "HOME"
@@ -283,5 +279,33 @@ class OnboardingFlowTest {
             listOf(OnboardingStep.ALL_SET),
             steps
         )
+    }
+
+    @Test
+    fun testDefaultLauncherSet_doesNotSkipToHomeUntilAllSetCompleted() {
+        val user = UserProfile("u1", "Alex", "alex@example.com")
+        prefsManager.saveAuthSession(AuthSession("token_123", user))
+        prefsManager.setIntroCompleted(true)
+
+        // User sets Unloop as default launcher, but has NOT confirmed "All Set" screen yet
+        assertFalse(prefsManager.isOnboardingCompleted())
+
+        // Even with default launcher set, the initial screen must remain ONBOARDING
+        val screen = determineInitialScreen(hasAuth = true, isEntitled = true, isDefaultLauncher = true)
+        assertEquals("ONBOARDING", screen)
+        assertFalse(prefsManager.isOnboardingCompleted())
+
+        // Active onboarding steps must display the final ALL_SET screen
+        val steps = getActiveOnboardingSteps(
+            isIntroCompleted = true,
+            isEntitled = true,
+            isDefaultLauncher = true
+        )
+        assertEquals(listOf(OnboardingStep.ALL_SET), steps)
+
+        // Only after user clicks "Let's Go" on the "All Set" screen (completing onboarding)
+        prefsManager.setOnboardingCompleted(true)
+        val homeScreen = determineInitialScreen(hasAuth = true, isEntitled = true, isDefaultLauncher = true)
+        assertEquals("HOME", homeScreen)
     }
 }
