@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import unloop.launcher.BuildConfig
 import unloop.launcher.auth.network.AuthApiException
+import unloop.launcher.subscription.model.AlreadyEntitledException
 import unloop.launcher.subscription.model.CheckoutIntent
 import unloop.launcher.subscription.model.EntitlementInfo
 import unloop.launcher.subscription.model.PricingHelper
