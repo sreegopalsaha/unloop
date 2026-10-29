@@ -25,9 +25,11 @@ import unloop.launcher.service.FilteredNotificationItem
 import unloop.launcher.service.NotificationManagerService
 import unloop.launcher.service.ShortVideoBlockerAccessibilityService
 import unloop.launcher.subscription.SubscriptionRepository
+import unloop.launcher.subscription.model.AlreadyEntitledException
 import unloop.launcher.subscription.model.CheckoutIntent
 import unloop.launcher.subscription.model.EntitlementInfo
 import unloop.launcher.subscription.model.EntitlementState
+import unloop.launcher.subscription.model.PendingPaymentVerification
 import unloop.launcher.subscription.model.SubscriptionPlan
 import unloop.launcher.subscription.payment.RazorpayCheckoutLauncher
 import unloop.launcher.util.AppSearchEngine
@@ -83,6 +85,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     private var pendingMonthlyIntent: CheckoutIntent.Monthly? = null
     private var pendingLifetimeIntent: CheckoutIntent.Lifetime? = null
+    private var lastFailedPayment: PendingPaymentVerification? = null
+    private val _hasPendingPaymentVerification = MutableStateFlow(false)
+    val hasPendingPaymentVerification: StateFlow<Boolean> = _hasPendingPaymentVerification.asStateFlow()
 
     private val _currentScreen = MutableStateFlow(determineInitialScreen())
     val currentScreen: StateFlow<LauncherScreen> = _currentScreen.asStateFlow()
@@ -583,6 +588,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 }
             }
         }
+        viewModelScope.launch {
+            isEntitled.collect { entitled ->
+                if (entitled && authRepository.hasValidSession()) {
+                    prefs.setIntroCompleted(true)
+                    prefs.setOnboardingCompleted(true)
+                    if (_currentScreen.value == LauncherScreen.ONBOARDING) {
+                        _currentScreen.value = LauncherScreen.HOME
+                    }
+                }
+            }
+        }
         checkSessionValidation()
     }
 
@@ -594,7 +610,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 _authState.value = AuthState.Error(result.reason)
                 _currentScreen.value = LauncherScreen.ONBOARDING
             } else {
-                subscriptionRepository.synchronizeEntitlement(forceServerCheck = false)
+                val syncResult = subscriptionRepository.synchronizeEntitlement(forceServerCheck = false)
+                if (syncResult.isSuccess && syncResult.getOrNull()?.isEntitled == true) {
+                    prefs.setIntroCompleted(true)
+                    prefs.setOnboardingCompleted(true)
+                    if (_currentScreen.value == LauncherScreen.ONBOARDING) {
+                        _currentScreen.value = LauncherScreen.HOME
+                    }
+                }
             }
         }
     }
@@ -665,7 +688,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 },
                 onFailure = { error ->
                     _isSubscriptionProcessing.value = false
-                    _subscriptionErrorMessage.value = error.message ?: "Failed to initiate monthly subscription"
+                    if (error is AlreadyEntitledException ||
+                        error.message?.contains("already have Lifetime Premium", ignoreCase = true) == true ||
+                        error.message?.contains("already own Lifetime Premium", ignoreCase = true) == true) {
+                        _subscriptionErrorMessage.value = null
+                        unlockExistingEntitlement()
+                    } else {
+                        _subscriptionErrorMessage.value = error.message ?: "Failed to initiate monthly subscription"
+                    }
                 }
             )
         }
@@ -691,9 +721,36 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 },
                 onFailure = { error ->
                     _isSubscriptionProcessing.value = false
-                    _subscriptionErrorMessage.value = error.message ?: "Failed to initiate lifetime purchase"
+                    if (error is AlreadyEntitledException ||
+                        error.message?.contains("already own Lifetime Premium", ignoreCase = true) == true ||
+                        error.message?.contains("already have Lifetime Premium", ignoreCase = true) == true) {
+                        _subscriptionErrorMessage.value = null
+                        unlockExistingEntitlement()
+                    } else {
+                        _subscriptionErrorMessage.value = error.message ?: "Failed to initiate lifetime purchase"
+                    }
                 }
             )
+        }
+    }
+
+    fun unlockExistingEntitlement() {
+        _isSubscriptionProcessing.value = true
+        viewModelScope.launch {
+            val syncResult = subscriptionRepository.synchronizeEntitlement(forceServerCheck = true)
+            _isSubscriptionProcessing.value = false
+            if (syncResult.isSuccess && syncResult.getOrNull()?.isEntitled == true) {
+                lastFailedPayment = null
+                _hasPendingPaymentVerification.value = false
+                completeOnboarding()
+            } else if (subscriptionRepository.evaluateLocalEntitlement()) {
+                lastFailedPayment = null
+                _hasPendingPaymentVerification.value = false
+                completeOnboarding()
+            } else {
+                _subscriptionErrorMessage.value = "Lifetime Premium confirmed. Opening Unloop..."
+                completeOnboarding()
+            }
         }
     }
 
@@ -718,11 +775,21 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                     onSuccess = {
                         _isSubscriptionProcessing.value = false
                         pendingMonthlyIntent = null
-                        // Entitlement updated, onboarding gate passed!
+                        lastFailedPayment = null
+                        _hasPendingPaymentVerification.value = false
+                        completeOnboarding()
                     },
                     onFailure = { error ->
                         _isSubscriptionProcessing.value = false
-                        _subscriptionErrorMessage.value = "Server verification: ${error.message}. Please retry."
+                        lastFailedPayment = PendingPaymentVerification(
+                            paymentId = pid,
+                            orderId = "",
+                            subscriptionId = subscriptionId,
+                            signature = signature,
+                            isMonthly = true
+                        )
+                        _hasPendingPaymentVerification.value = true
+                        _subscriptionErrorMessage.value = "Payment was received, but server verification was interrupted (${error.message}). Tap 'Retry Verification' below to activate access."
                     }
                 )
             } else if (orderId.isNotBlank()) {
@@ -731,16 +798,31 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                     onSuccess = {
                         _isSubscriptionProcessing.value = false
                         pendingLifetimeIntent = null
+                        lastFailedPayment = null
+                        _hasPendingPaymentVerification.value = false
+                        completeOnboarding()
                     },
                     onFailure = { error ->
                         _isSubscriptionProcessing.value = false
-                        _subscriptionErrorMessage.value = "Server verification: ${error.message}. Please retry."
+                        lastFailedPayment = PendingPaymentVerification(
+                            paymentId = pid,
+                            orderId = orderId,
+                            subscriptionId = null,
+                            signature = signature,
+                            isMonthly = false
+                        )
+                        _hasPendingPaymentVerification.value = true
+                        _subscriptionErrorMessage.value = "Payment was received, but server verification was interrupted (${error.message}). Tap 'Retry Verification' below to activate access."
                     }
                 )
             } else {
+                val syncResult = subscriptionRepository.synchronizeEntitlement(forceServerCheck = true)
                 _isSubscriptionProcessing.value = false
-                _subscriptionErrorMessage.value = "Verifying latest status with server..."
-                subscriptionRepository.synchronizeEntitlement(forceServerCheck = true)
+                if (syncResult.isSuccess && syncResult.getOrNull()?.isEntitled == true) {
+                    completeOnboarding()
+                } else {
+                    _subscriptionErrorMessage.value = "Payment completed. Syncing entitlement with server..."
+                }
             }
         }
     }
@@ -761,12 +843,59 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _subscriptionErrorMessage.value = null
     }
 
+    fun retryPaymentVerification() {
+        val pending = lastFailedPayment
+        if (pending != null) {
+            _isSubscriptionProcessing.value = true
+            _subscriptionErrorMessage.value = null
+            viewModelScope.launch {
+                val verifyResult = if (pending.isMonthly && !pending.subscriptionId.isNullOrBlank()) {
+                    subscriptionRepository.verifyMonthlySubscription(pending.paymentId, pending.subscriptionId, pending.signature)
+                } else {
+                    subscriptionRepository.verifyLifetimePayment(pending.paymentId, pending.orderId, pending.signature)
+                }
+
+                verifyResult.fold(
+                    onSuccess = {
+                        _isSubscriptionProcessing.value = false
+                        lastFailedPayment = null
+                        _hasPendingPaymentVerification.value = false
+                        completeOnboarding()
+                    },
+                    onFailure = { error ->
+                        // Also check if server already has user entitlement set
+                        val syncResult = subscriptionRepository.synchronizeEntitlement(forceServerCheck = true)
+                        _isSubscriptionProcessing.value = false
+                        if (syncResult.isSuccess && syncResult.getOrNull()?.isEntitled == true) {
+                            lastFailedPayment = null
+                            _hasPendingPaymentVerification.value = false
+                            completeOnboarding()
+                        } else {
+                            _subscriptionErrorMessage.value = "Server verification retry failed: ${error.message}. Please retry in a moment."
+                        }
+                    }
+                )
+            }
+        } else {
+            retrySubscriptionSync()
+        }
+    }
+
     fun retrySubscriptionSync() {
         _isSubscriptionProcessing.value = true
         _subscriptionErrorMessage.value = null
         viewModelScope.launch {
-            subscriptionRepository.synchronizeEntitlement(forceServerCheck = true)
+            val result = subscriptionRepository.synchronizeEntitlement(forceServerCheck = true)
             _isSubscriptionProcessing.value = false
+            if (result.isSuccess && result.getOrNull()?.isEntitled == true) {
+                lastFailedPayment = null
+                _hasPendingPaymentVerification.value = false
+                completeOnboarding()
+            } else {
+                result.onFailure { error ->
+                    _subscriptionErrorMessage.value = "Sync notice: ${error.message}. Check connection and retry."
+                }
+            }
         }
     }
 
@@ -775,6 +904,21 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             subscriptionRepository.cancelMonthlySubscription()
             _isSubscriptionProcessing.value = false
+        }
+    }
+
+    fun openAndroidHomeSettings(activity: Activity) {
+        val intents = listOf(
+            Intent(Settings.ACTION_HOME_SETTINGS),
+            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS)
+        )
+        for (intent in intents) {
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                activity.startActivity(intent)
+                return
+            } catch (_: Exception) {}
         }
     }
 }

@@ -53,10 +53,15 @@ fun OnboardingSubscriptionScreen(
     plans: List<SubscriptionPlan>,
     isProcessing: Boolean,
     errorMessage: String?,
+    hasPendingPaymentVerification: Boolean = false,
+    isEntitled: Boolean = false,
     onSubscribeMonthly: () -> Unit,
     onPurchaseLifetime: () -> Unit,
     onClearError: () -> Unit,
     onRetrySync: () -> Unit,
+    onRetryPaymentVerification: () -> Unit = onRetrySync,
+    onOpenHomeSettings: () -> Unit = {},
+    onCompleteOnboarding: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedPlanId by remember { mutableStateOf(PricingHelper.PLAN_MONTHLY) }
@@ -210,6 +215,48 @@ fun OnboardingSubscriptionScreen(
             }
         }
 
+        // Pending Verification Banner
+        if (hasPendingPaymentVerification) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Payment Received — Pending Activation",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Your payment succeeded on Razorpay. Tap below to finalize your premium entitlement.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
+                        )
+                    }
+                    Button(
+                        onClick = onRetryPaymentVerification,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text(text = "Verify Now", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+
         // Error message banner
         if (!errorMessage.isNullOrBlank()) {
             Surface(
@@ -238,7 +285,7 @@ fun OnboardingSubscriptionScreen(
                         )
                     }
                     Button(
-                        onClick = onRetrySync,
+                        onClick = if (hasPendingPaymentVerification) onRetryPaymentVerification else onRetrySync,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.onBackground
@@ -246,7 +293,10 @@ fun OnboardingSubscriptionScreen(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.height(36.dp)
                     ) {
-                        Text(text = "Retry", style = MaterialTheme.typography.labelSmall)
+                        Text(
+                            text = if (hasPendingPaymentVerification) "Retry Verify" else "Retry",
+                            style = MaterialTheme.typography.labelSmall
+                        )
                     }
                 }
             }
@@ -254,47 +304,73 @@ fun OnboardingSubscriptionScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Main CTA Button
-        Button(
-            onClick = {
-                if (isProcessing) return@Button
-                if (selectedPlanId == PricingHelper.PLAN_MONTHLY) {
-                    onSubscribeMonthly()
-                } else {
-                    onPurchaseLifetime()
-                }
-            },
-            enabled = !isProcessing,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp)
-        ) {
-            if (isProcessing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    strokeWidth = 2.5.dp,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-                Spacer(modifier = Modifier.width(12.dp))
+        if (isEntitled) {
+            Button(
+                onClick = onCompleteOnboarding,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+            ) {
                 Text(
-                    text = "Verifying with server...",
+                    text = "Premium Active • Open Unloop",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                 )
-            } else {
-                val buttonText = if (selectedPlanId == PricingHelper.PLAN_MONTHLY) {
-                    "Authorize Monthly AutoPay • ₹99/mo"
+            }
+        } else {
+            // Main CTA Button
+            Button(
+                onClick = {
+                    if (isProcessing) return@Button
+                    if (hasPendingPaymentVerification) {
+                        onRetryPaymentVerification()
+                    } else if (selectedPlanId == PricingHelper.PLAN_MONTHLY) {
+                        onSubscribeMonthly()
+                    } else {
+                        onPurchaseLifetime()
+                    }
+                },
+                enabled = !isProcessing,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+            ) {
+                if (isProcessing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.5.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Verifying with server...",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                } else if (hasPendingPaymentVerification) {
+                    Text(
+                        text = "Complete Payment Verification",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
                 } else {
-                    "Get Lifetime Premium • ₹699"
+                    val buttonText = if (selectedPlanId == PricingHelper.PLAN_MONTHLY) {
+                        "Authorize Monthly AutoPay • ₹99/mo"
+                    } else {
+                        "Get Lifetime Premium • ₹699"
+                    }
+                    Text(
+                        text = buttonText,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
                 }
-                Text(
-                    text = buttonText,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                )
             }
         }
 
@@ -307,7 +383,21 @@ fun OnboardingSubscriptionScreen(
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Safe Launcher Escape Option: user can open system default apps settings to switch launchers
+        TextButton(
+            onClick = onOpenHomeSettings,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Change Default Launcher / System Settings",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.85f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
     }
 }
 

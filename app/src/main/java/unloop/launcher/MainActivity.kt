@@ -110,6 +110,7 @@ fun LauncherRoot(
     val subscriptionPlans by viewModel.subscriptionPlans.collectAsState()
     val isSubscriptionProcessing by viewModel.isSubscriptionProcessing.collectAsState()
     val subscriptionErrorMessage by viewModel.subscriptionErrorMessage.collectAsState()
+    val hasPendingPaymentVerification by viewModel.hasPendingPaymentVerification.collectAsState()
     val entitlementState by viewModel.entitlementState.collectAsState()
 
     Crossfade(targetState = currentScreen, label = "ScreenTransition") { screen ->
@@ -123,12 +124,15 @@ fun LauncherRoot(
                     plans = subscriptionPlans,
                     isSubscriptionProcessing = isSubscriptionProcessing,
                     subscriptionErrorMessage = subscriptionErrorMessage,
+                    hasPendingPaymentVerification = hasPendingPaymentVerification,
                     onContinueWithGoogle = { viewModel.loginWithGoogle(activity) },
                     onDismissAuthError = { viewModel.dismissAuthError() },
                     onSubscribeMonthly = { viewModel.subscribeMonthly(activity) },
                     onPurchaseLifetime = { viewModel.purchaseLifetime(activity) },
                     onClearSubscriptionError = { viewModel.clearSubscriptionError() },
                     onRetrySubscriptionSync = { viewModel.retrySubscriptionSync() },
+                    onRetryPaymentVerification = { viewModel.retryPaymentVerification() },
+                    onOpenHomeSettings = { viewModel.openAndroidHomeSettings(activity) },
                     onSetDefaultLauncher = { viewModel.openSetDefaultLauncher(activity) },
                     onCompleteOnboarding = { viewModel.completeOnboarding() },
                     onIntroCompleted = { viewModel.markIntroCompleted() }

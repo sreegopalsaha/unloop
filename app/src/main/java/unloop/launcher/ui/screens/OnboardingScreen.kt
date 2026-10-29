@@ -1,5 +1,7 @@
 package unloop.launcher.ui.screens
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
@@ -59,12 +61,15 @@ fun OnboardingScreen(
     plans: List<SubscriptionPlan> = emptyList(),
     isSubscriptionProcessing: Boolean = false,
     subscriptionErrorMessage: String? = null,
+    hasPendingPaymentVerification: Boolean = false,
     onContinueWithGoogle: () -> Unit,
     onDismissAuthError: () -> Unit = {},
     onSubscribeMonthly: () -> Unit = {},
     onPurchaseLifetime: () -> Unit = {},
     onClearSubscriptionError: () -> Unit = {},
     onRetrySubscriptionSync: () -> Unit = {},
+    onRetryPaymentVerification: () -> Unit = onRetrySubscriptionSync,
+    onOpenHomeSettings: () -> Unit = {},
     onSetDefaultLauncher: () -> Unit,
     onCompleteOnboarding: () -> Unit,
     onIntroCompleted: () -> Unit
@@ -75,6 +80,17 @@ fun OnboardingScreen(
     ) { pageCount }
     val coroutineScope = rememberCoroutineScope()
     val isAuthenticated = authState is AuthState.Authenticated
+
+    // Android Back Handler safeguard to prevent launcher lockout on onboarding/subscription
+    BackHandler(enabled = pagerState.currentPage > 0) {
+        coroutineScope.launch {
+            when (pagerState.currentPage) {
+                2 -> pagerState.animateScrollToPage(1)
+                3 -> pagerState.animateScrollToPage(2)
+                1 -> pagerState.animateScrollToPage(0)
+            }
+        }
+    }
 
     // Auto-advance to Page 1 (Welcome to Unloop) as soon as user successfully signs in on Page 0
     LaunchedEffect(isAuthenticated) {
@@ -152,10 +168,15 @@ fun OnboardingScreen(
                                 plans = plans,
                                 isProcessing = isSubscriptionProcessing,
                                 errorMessage = subscriptionErrorMessage,
+                                hasPendingPaymentVerification = hasPendingPaymentVerification,
+                                isEntitled = isEntitled,
                                 onSubscribeMonthly = onSubscribeMonthly,
                                 onPurchaseLifetime = onPurchaseLifetime,
                                 onClearError = onClearSubscriptionError,
-                                onRetrySync = onRetrySubscriptionSync
+                                onRetrySync = onRetrySubscriptionSync,
+                                onRetryPaymentVerification = onRetryPaymentVerification,
+                                onOpenHomeSettings = onOpenHomeSettings,
+                                onCompleteOnboarding = onCompleteOnboarding
                             )
                         }
                     } else {
@@ -191,10 +212,15 @@ fun OnboardingScreen(
                                 plans = plans,
                                 isProcessing = isSubscriptionProcessing,
                                 errorMessage = subscriptionErrorMessage,
+                                hasPendingPaymentVerification = hasPendingPaymentVerification,
+                                isEntitled = isEntitled,
                                 onSubscribeMonthly = onSubscribeMonthly,
                                 onPurchaseLifetime = onPurchaseLifetime,
                                 onClearError = onClearSubscriptionError,
-                                onRetrySync = onRetrySubscriptionSync
+                                onRetrySync = onRetrySubscriptionSync,
+                                onRetryPaymentVerification = onRetryPaymentVerification,
+                                onOpenHomeSettings = onOpenHomeSettings,
+                                onCompleteOnboarding = onCompleteOnboarding
                             )
                         }
                     } else {

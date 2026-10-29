@@ -175,3 +175,14 @@ enum class EntitlementSource {
     SERVER_VERIFIED,
     CRYPTOGRAPHICALLY_VERIFIED_OFFLINE
 }
+
+data class PendingPaymentVerification(
+    val paymentId: String,
+    val orderId: String,
+    val subscriptionId: String? = null,
+    val signature: String,
+    val isMonthly: Boolean = false,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+class AlreadyEntitledException(message: String) : Exception(message)

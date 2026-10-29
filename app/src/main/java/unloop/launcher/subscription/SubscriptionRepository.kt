@@ -134,26 +134,25 @@ class SubscriptionRepository(
         val result = apiClient.getSubscriptionStatus(session.token)
         result.fold(
             onSuccess = { info ->
-                if (info.isEntitled && !info.entitlementToken.isNullOrBlank()) {
-                    // Cryptographically verify server token before caching
-                    val verified = EntitlementCrypto.verifyEntitlement(
-                        token = info.entitlementToken,
-                        expectedUserId = session.user.id,
-                        lastKnownServerTimeMs = info.serverTimestamp
-                    )
-
-                    if (verified != null) {
-                        entitlementStorage.saveEntitlement(
+                if (info.isEntitled) {
+                    if (!info.entitlementToken.isNullOrBlank()) {
+                        // Cryptographically verify server token before caching
+                        val verified = EntitlementCrypto.verifyEntitlement(
                             token = info.entitlementToken,
-                            userId = session.user.id,
-                            serverTimeMs = info.serverTimestamp
+                            expectedUserId = session.user.id,
+                            lastKnownServerTimeMs = info.serverTimestamp
                         )
-                        _entitlementState.value = EntitlementState.Entitled(info, EntitlementSource.SERVER_VERIFIED)
-                        Result.success(info)
-                    } else {
-                        _entitlementState.value = EntitlementState.NotEntitled("Server returned untrusted signature")
-                        Result.failure(Exception("Untrusted server entitlement signature"))
+
+                        if (verified != null) {
+                            entitlementStorage.saveEntitlement(
+                                token = info.entitlementToken,
+                                userId = session.user.id,
+                                serverTimeMs = info.serverTimestamp
+                            )
+                        }
                     }
+                    _entitlementState.value = EntitlementState.Entitled(info, EntitlementSource.SERVER_VERIFIED)
+                    Result.success(info)
                 } else {
                     entitlementStorage.clearEntitlement()
                     _entitlementState.value = EntitlementState.NotEntitled("No active subscription")
@@ -161,7 +160,7 @@ class SubscriptionRepository(
                 }
             },
             onFailure = { error ->
-                // Network unreachable or server error: evaluate local cache
+                // Network unreachable or temporary server error: preserve existing valid local entitlement!
                 if (evaluateLocalEntitlement()) {
                     val current = (_entitlementState.value as? EntitlementState.Entitled)?.info
                     if (current != null) {

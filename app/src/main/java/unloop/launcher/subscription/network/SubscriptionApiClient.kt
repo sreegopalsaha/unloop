@@ -92,7 +92,12 @@ open class SubscriptionApiClient(
                 )
             } else {
                 val message = json.optString("message", "Failed to create subscription (HTTP $statusCode)")
-                Result.failure(AuthApiException(message, statusCode))
+                val code = json.optString("code", "")
+                if (code == "ALREADY_LIFETIME" || message.contains("already have Lifetime Premium", ignoreCase = true) || message.contains("already own Lifetime Premium", ignoreCase = true)) {
+                    Result.failure(AlreadyEntitledException(message))
+                } else {
+                    Result.failure(AuthApiException(message, statusCode))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -197,7 +202,12 @@ open class SubscriptionApiClient(
                 )
             } else {
                 val message = json.optString("message", "Failed to create lifetime order (HTTP $statusCode)")
-                Result.failure(AuthApiException(message, statusCode))
+                val code = json.optString("code", "")
+                if (code == "ALREADY_LIFETIME" || message.contains("already own Lifetime Premium", ignoreCase = true) || message.contains("already have Lifetime Premium", ignoreCase = true)) {
+                    Result.failure(AlreadyEntitledException(message))
+                } else {
+                    Result.failure(AuthApiException(message, statusCode))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)
