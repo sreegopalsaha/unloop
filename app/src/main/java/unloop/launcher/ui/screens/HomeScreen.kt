@@ -165,7 +165,7 @@ fun HomeScreen(
                     items(favoriteApps, key = { it.packageName }) { app ->
                         Text(
                             text = app.label,
-                            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp),
+                            style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier
                                 .fillMaxWidth()
