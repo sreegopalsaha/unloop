@@ -43,7 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import unloop.launcher.service.FilteredNotificationItem
 import unloop.launcher.ui.components.HeaderActionType
-import unloop.launcher.ui.components.PermissionRationaleDialog
+import unloop.launcher.ui.components.NotificationAccessRationaleDialog
+import unloop.launcher.ui.components.BatteryOptimizationRationaleDialog
 import unloop.launcher.ui.components.ScreenHeader
 
 @Composable
@@ -321,11 +322,7 @@ fun NotificationsScreen(
 
     // Permission Rationale Dialog for Notification Listener Access
     if (showPermissionDialog) {
-        PermissionRationaleDialog(
-            title = "Notification Access Required",
-            message = "Unloop requires Notification Access to filter distracting alerts from your status bar and store them privately for mindful review.\n\nYour notifications are stored locally on your device and never leave Unloop.",
-            confirmButtonText = "Open Settings",
-            dismissButtonText = "Cancel",
+        NotificationAccessRationaleDialog(
             onConfirm = {
                 showPermissionDialog = false
                 onOpenNotificationSettings()
@@ -339,11 +336,7 @@ fun NotificationsScreen(
 
     // Battery Optimization Guidance Dialog
     if (showBatteryOptimizationDialog) {
-        PermissionRationaleDialog(
-            title = "Unrestricted Battery Usage",
-            message = "To filter notifications reliably without Android putting Unloop to sleep in the background, set battery usage to Unrestricted.\n\nNote: Even with unrestricted battery settings, some device manufacturers (such as Samsung, Xiaomi, or OnePlus) impose custom background restrictions that Android does not allow apps to completely bypass.",
-            confirmButtonText = "Allow Unrestricted",
-            dismissButtonText = "Keep Optimized",
+        BatteryOptimizationRationaleDialog(
             onConfirm = onConfirmBatteryOptimizationDialog,
             onDismiss = onDismissBatteryOptimizationDialog
         )

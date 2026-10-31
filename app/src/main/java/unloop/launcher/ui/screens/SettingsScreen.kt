@@ -38,7 +38,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import unloop.launcher.ui.components.HeaderActionType
-import unloop.launcher.ui.components.PermissionRationaleDialog
+import unloop.launcher.ui.components.AccessibilityRationaleDialog
+import unloop.launcher.ui.components.NotificationAccessRationaleDialog
 import unloop.launcher.ui.components.ScreenHeader
 import unloop.launcher.auth.model.AuthState
 import unloop.launcher.util.AppVersionUtils
@@ -328,11 +329,7 @@ fun SettingsScreen(
 
     // Accessibility Permission Rationale Dialog for Short-Video Blocker
     if (showAccessibilityDialog) {
-        PermissionRationaleDialog(
-            title = "Accessibility Permission Required",
-            message = "Short-Video Blocker requires Accessibility permission to detect and exit short-form video reels and shorts (YouTube Shorts, Instagram Reels, Facebook Reels, and Snapchat Spotlight).\n\nUnloop operates entirely on-device and never records keystrokes, personal messages, or private data.",
-            confirmButtonText = "Open Settings",
-            dismissButtonText = "Cancel",
+        AccessibilityRationaleDialog(
             onConfirm = {
                 showAccessibilityDialog = false
                 onOpenAccessibilitySettings()
@@ -346,11 +343,7 @@ fun SettingsScreen(
 
     // Notification Access Rationale Dialog for Notification Manager
     if (showNotificationDialog) {
-        PermissionRationaleDialog(
-            title = "Notification Access Required",
-            message = "Notification Manager requires Notification Access to filter distracting notifications from your status bar and store them privately for mindful review.\n\nYour notifications are stored locally on your device and never leave Unloop.",
-            confirmButtonText = "Open Settings",
-            dismissButtonText = "Cancel",
+        NotificationAccessRationaleDialog(
             onConfirm = {
                 showNotificationDialog = false
                 onOpenNotificationSettings()

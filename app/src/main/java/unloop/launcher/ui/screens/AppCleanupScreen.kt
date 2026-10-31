@@ -51,7 +51,7 @@ import androidx.compose.ui.unit.sp
 import unloop.launcher.ui.components.HeaderActionType
 import unloop.launcher.ui.components.ScreenHeader
 import unloop.launcher.data.AppItem
-import unloop.launcher.ui.components.PermissionRationaleDialog
+import unloop.launcher.ui.components.UsageAccessRationaleDialog
 import unloop.launcher.util.AppCleanupManager
 import unloop.launcher.util.AppIconCache
 
@@ -361,11 +361,7 @@ fun AppCleanupScreen(
     }
 
     if (showPermissionDialog) {
-        PermissionRationaleDialog(
-            title = "Usage Access Required",
-            message = "App Cleanup requires Usage Access to identify apps that haven't been used for 10 or more days.\n\nYour app usage information is processed entirely on-device and is never shared or transmitted anywhere.",
-            confirmButtonText = "Open Settings",
-            dismissButtonText = "Cancel",
+        UsageAccessRationaleDialog(
             onConfirm = {
                 showPermissionDialog = false
                 onOpenUsageSettings()
