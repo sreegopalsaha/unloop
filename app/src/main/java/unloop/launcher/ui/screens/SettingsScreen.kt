@@ -273,10 +273,18 @@ fun SettingsScreen(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
-            // About Unloop
+            // About & Support
             SettingItem(
-                title = "About Unloop",
-                subtitle = "App information and legal details",
+                title = "About & Support",
+                subtitle = "Help, feedback, and legal details",
+                trailing = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
                 onClick = onOpenAbout
             )
         }

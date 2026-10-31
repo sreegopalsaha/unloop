@@ -20,6 +20,8 @@ import unloop.launcher.subscription.worker.SubscriptionSyncWorker
 import unloop.launcher.ui.LauncherScreen
 import unloop.launcher.ui.LauncherViewModel
 import unloop.launcher.ui.screens.AboutScreen
+import unloop.launcher.auth.model.AuthState
+import unloop.launcher.ui.screens.FeedbackScreen
 import unloop.launcher.ui.screens.AccountScreen
 import unloop.launcher.ui.screens.AllAppsScreen
 import unloop.launcher.ui.screens.AppCleanupScreen
@@ -255,7 +257,22 @@ fun LauncherRoot(
 
             LauncherScreen.ABOUT -> {
                 AboutScreen(
-                    onBack = { viewModel.navigateTo(LauncherScreen.SETTINGS) }
+                    onBack = { viewModel.navigateTo(LauncherScreen.SETTINGS) },
+                    onSendFeedbackClick = { viewModel.navigateTo(LauncherScreen.FEEDBACK) }
+                )
+            }
+
+            LauncherScreen.FEEDBACK -> {
+                val feedbackState by viewModel.feedbackSubmissionState.collectAsState()
+
+                FeedbackScreen(
+                    submissionState = feedbackState,
+                    onSubmitFeedback = { text -> viewModel.submitFeedback(text) },
+                    onResetState = { viewModel.resetFeedbackState() },
+                    onBack = {
+                        viewModel.resetFeedbackState()
+                        viewModel.navigateTo(LauncherScreen.ABOUT)
+                    }
                 )
             }
 

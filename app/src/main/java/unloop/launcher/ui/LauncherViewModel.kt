@@ -34,6 +34,9 @@ import unloop.launcher.subscription.model.SubscriptionPlan
 import unloop.launcher.subscription.payment.RazorpayCheckoutLauncher
 import unloop.launcher.util.AppSearchEngine
 import unloop.launcher.util.PermissionUtils
+import unloop.launcher.feedback.network.FeedbackApiClient
+import unloop.launcher.feedback.network.FeedbackSubmissionResult
+import unloop.launcher.ui.screens.FeedbackSubmissionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -52,7 +55,8 @@ enum class LauncherScreen {
     NOTIFICATIONS,
     ABOUT,
     APP_CLEANUP,
-    ACCOUNT
+    ACCOUNT,
+    FEEDBACK
 }
 
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
@@ -939,5 +943,47 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun openAndroidHomeSettings(activity: Activity) {
         openSetDefaultLauncher(activity)
+    }
+
+    private val feedbackApiClient = FeedbackApiClient()
+
+    private val _feedbackSubmissionState = MutableStateFlow<FeedbackSubmissionState>(FeedbackSubmissionState.Idle)
+    val feedbackSubmissionState: StateFlow<FeedbackSubmissionState> = _feedbackSubmissionState.asStateFlow()
+
+    fun submitFeedback(feedbackText: String, rating: Int? = null) {
+        if (_feedbackSubmissionState.value is FeedbackSubmissionState.Submitting) return
+
+        val currentAuth = _authState.value
+        val (name, email, token) = when (currentAuth) {
+            is AuthState.Authenticated -> Triple(
+                currentAuth.session.user.name,
+                currentAuth.session.user.email,
+                currentAuth.session.token
+            )
+            else -> Triple("User", "", null)
+        }
+
+        _feedbackSubmissionState.value = FeedbackSubmissionState.Submitting
+        viewModelScope.launch {
+            val result = feedbackApiClient.submitFeedback(
+                context = getApplication(),
+                name = name,
+                email = email,
+                feedback = feedbackText,
+                rating = rating,
+                token = token
+            )
+            _feedbackSubmissionState.value = when (result) {
+                is FeedbackSubmissionResult.Success -> FeedbackSubmissionState.Success(result.message)
+                is FeedbackSubmissionResult.Error -> FeedbackSubmissionState.Error(
+                    message = result.message,
+                    isNetworkError = result.isNetworkError
+                )
+            }
+        }
+    }
+
+    fun resetFeedbackState() {
+        _feedbackSubmissionState.value = FeedbackSubmissionState.Idle
     }
 }
