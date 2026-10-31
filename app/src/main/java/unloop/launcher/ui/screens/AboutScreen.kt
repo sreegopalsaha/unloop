@@ -19,12 +19,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -34,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import unloop.launcher.BuildConfig
 import unloop.launcher.ui.components.HeaderActionType
 import unloop.launcher.ui.components.ScreenHeader
 import unloop.launcher.util.AppVersionUtils
@@ -46,7 +49,8 @@ fun AboutScreen(
     onSendFeedbackClick: (() -> Unit)? = null,
     onPrivacyPolicyClick: (() -> Unit)? = null,
     onTermsOfServiceClick: (() -> Unit)? = null,
-    onRefundPolicyClick: (() -> Unit)? = null
+    onRefundPolicyClick: (() -> Unit)? = null,
+    onLearnMoreClick: (() -> Unit)? = null
 ) {
     BackHandler(onBack = onBack)
 
@@ -97,14 +101,13 @@ fun AboutScreen(
 
             AboutActionItem(
                 title = "Get Help & FAQs",
-                subtitle = "Troubleshooting guide and common questions",
                 onClick = {
                     if (onGetHelpClick != null) {
                         onGetHelpClick()
                     } else {
                         openUrlSafely(
                             context = context,
-                            url = "https://unloop-landing-page.vercel.app/help",
+                            url = "${BuildConfig.LANDING_PAGE_BASE_URL}/help",
                             fallbackEmailSubject = "Unloop Help & Support"
                         )
                     }
@@ -115,7 +118,6 @@ fun AboutScreen(
 
             AboutActionItem(
                 title = "Send Feedback",
-                subtitle = "Report issues, suggest features, or say hi",
                 onClick = {
                     if (onSendFeedbackClick != null) {
                         onSendFeedbackClick()
@@ -134,14 +136,13 @@ fun AboutScreen(
 
             AboutActionItem(
                 title = "Privacy Policy",
-                subtitle = "Learn how your data stays strictly on-device",
                 onClick = {
                     if (onPrivacyPolicyClick != null) {
                         onPrivacyPolicyClick()
                     } else {
                         openUrlSafely(
                             context = context,
-                            url = "https://unloop-landing-page.vercel.app/privacy-policy/",
+                            url = "${BuildConfig.LANDING_PAGE_BASE_URL}/privacy-policy/",
                             fallbackEmailSubject = "Unloop Privacy Inquiry"
                         )
                     }
@@ -152,14 +153,13 @@ fun AboutScreen(
 
             AboutActionItem(
                 title = "Terms and Conditions",
-                subtitle = "Review our terms of service and license grant",
                 onClick = {
                     if (onTermsOfServiceClick != null) {
                         onTermsOfServiceClick()
                     } else {
                         openUrlSafely(
                             context = context,
-                            url = "https://unloop-landing-page.vercel.app/terms-and-conditions/",
+                            url = "${BuildConfig.LANDING_PAGE_BASE_URL}/terms-and-conditions/",
                             fallbackEmailSubject = "Unloop Terms & Conditions"
                         )
                     }
@@ -170,14 +170,13 @@ fun AboutScreen(
 
             AboutActionItem(
                 title = "Refund & Cancellation Policy",
-                subtitle = "Subscription plans, duplicate charges, and refund requests",
                 onClick = {
                     if (onRefundPolicyClick != null) {
                         onRefundPolicyClick()
                     } else {
                         openUrlSafely(
                             context = context,
-                            url = "https://unloop-landing-page.vercel.app/refund-policy/",
+                            url = "${BuildConfig.LANDING_PAGE_BASE_URL}/refund-policy/",
                             fallbackEmailSubject = "Unloop Refund Inquiry"
                         )
                     }
@@ -196,49 +195,40 @@ fun AboutScreen(
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                text = "Break free from endless scrolling and build a healthier relationship with your phone. Unloop is a simple, distraction-free Android launcher designed to help you take control of your attention. With a clean home screen and built-in tools to manage distractions, Unloop helps you spend less time mindlessly scrolling and more time doing what matters.",
+                text = "Unloop is a distraction-free Android launcher designed to help you reduce screen time, eliminate digital clutter, and stay focused on what truly matters.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "With a clean, text-based home screen and no distracting app icons, Unloop helps you focus on what you actually need. Open what matters, ignore what doesn't, and take back control of your attention.",
+                text = "By replacing addictive visual triggers with a minimal, text-first interface and mindful tools, Unloop empowers you to break free from endless scrolling and build a healthier, more intentional relationship with your phone.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.padding(vertical = 24.dp)
-            )
-
-            Text(
-                text = "Features",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            FeatureItem(
-                title = "Clean Home Screen",
-                description = "A simple, text-based interface without distracting app icons."
-            )
-            FeatureItem(
-                title = "Focus Mode",
-                description = "Reduce distractions when studying, working, or concentrating on what matters."
-            )
-            FeatureItem(
-                title = "Short-Video Blocking",
-                description = "Help break the habit of endlessly scrolling through short videos on supported apps and interfaces."
-            )
-            FeatureItem(
-                title = "Notification Management",
-                description = "Keep distracting notifications out of your way and review filtered alerts inside Unloop."
-            )
-            FeatureItem(
-                title = "Hidden Apps",
-                description = "Hide selected apps from your regular home screen and manage them when needed."
-            )
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = {
+                    if (onLearnMoreClick != null) {
+                        onLearnMoreClick()
+                    } else {
+                        openUrlSafely(
+                            context = context,
+                            url = BuildConfig.LANDING_PAGE_BASE_URL,
+                            fallbackEmailSubject = "Learn more about Unloop"
+                        )
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = "Learn more about Unloop..",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
 
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -333,30 +323,6 @@ private fun AboutActionItem(
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.size(20.dp)
-        )
-    }
-}
-
-@Composable
-private fun FeatureItem(
-    title: String,
-    description: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Spacer(modifier = Modifier.height(3.dp))
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

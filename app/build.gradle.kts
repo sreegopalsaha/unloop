@@ -21,6 +21,7 @@ val localProperties = Properties().apply {
 }
 val googleWebClientId = localProperties.getProperty("GOOGLE_WEB_CLIENT_ID") ?: ""
 val backendBaseUrl = localProperties.getProperty("BACKEND_BASE_URL") ?: "https://unloop-web-black.vercel.app"
+val landingPageBaseUrl = localProperties.getProperty("LANDING_PAGE_BASE_URL") ?: "https://unloop-landing-page.vercel.app"
 
 android {
     namespace = "unloop.launcher"
@@ -39,6 +40,7 @@ android {
 
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
         buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
+        buildConfigField("String", "LANDING_PAGE_BASE_URL", "\"$landingPageBaseUrl\"")
     }
 
     signingConfigs {
