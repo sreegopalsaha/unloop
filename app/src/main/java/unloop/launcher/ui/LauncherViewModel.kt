@@ -34,6 +34,7 @@ import unloop.launcher.subscription.model.SubscriptionPlan
 import unloop.launcher.subscription.payment.RazorpayCheckoutLauncher
 import unloop.launcher.util.AppSearchEngine
 import unloop.launcher.util.PermissionUtils
+import unloop.launcher.util.WallpaperThemeManager
 import unloop.launcher.feedback.network.FeedbackApiClient
 import unloop.launcher.feedback.network.FeedbackSubmissionResult
 import unloop.launcher.ui.screens.FeedbackSubmissionState
@@ -65,6 +66,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val repository = AppsRepository.getInstance(application, prefs)
     private val authRepository = AuthRepository(prefs)
     private val subscriptionRepository = SubscriptionRepository(application, prefs)
+    val wallpaperThemeManager = WallpaperThemeManager.getInstance(application)
 
     val authSession: StateFlow<AuthSession?> = authRepository.authSessionFlow
     private val _authState = MutableStateFlow<AuthState>(
@@ -175,6 +177,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val focusModeEnabled: StateFlow<Boolean> = prefs.focusModeFlow
     val focusApps: StateFlow<Set<String>> = prefs.focusAppsFlow
     val themeMode: StateFlow<String> = prefs.themeModeFlow
+    val themeWallpaperSyncEnabled: StateFlow<Boolean> = prefs.themeWallpaperSyncFlow
     val showSystemAppsCleanup: StateFlow<Boolean> = prefs.showSystemAppsCleanupFlow
 
     fun setShowSystemAppsCleanup(show: Boolean) {
@@ -364,6 +367,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             subscriptionRepository.refreshPlans()
         }
+        if (!_isDefaultLauncher.value && prefs.wasThemeWallpaperApplied()) {
+            viewModelScope.launch {
+                wallpaperThemeManager.restoreOriginalWallpaper()
+            }
+        }
     }
 
     fun refreshApps() {
@@ -502,6 +510,29 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         prefs.setThemeMode(mode)
     }
 
+    fun setThemeWallpaperSyncEnabled(enabled: Boolean) {
+        prefs.setThemeWallpaperSyncEnabled(enabled)
+        if (!enabled) {
+            viewModelScope.launch {
+                wallpaperThemeManager.restoreOriginalWallpaper()
+            }
+        }
+    }
+
+    fun syncThemeWallpaper(isDark: Boolean) {
+        viewModelScope.launch {
+            wallpaperThemeManager.applyThemeWallpaper(isDark, _isDefaultLauncher.value)
+        }
+    }
+
+    fun restoreOriginalWallpaperIfNeeded() {
+        if (prefs.wasThemeWallpaperApplied()) {
+            viewModelScope.launch {
+                wallpaperThemeManager.restoreOriginalWallpaper()
+            }
+        }
+    }
+
     private fun determineInitialScreen(): LauncherScreen {
         if (!authRepository.hasValidSession()) {
             return LauncherScreen.ONBOARDING
@@ -549,7 +580,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun checkDefaultStatus() {
         val isDefault = checkIfDefaultLauncher()
+        val previousDefault = _isDefaultLauncher.value
         _isDefaultLauncher.value = isDefault
+        if (previousDefault && !isDefault) {
+            // User switched away from Unloop as default launcher -> restore original wallpaper
+            viewModelScope.launch {
+                wallpaperThemeManager.restoreOriginalWallpaper()
+            }
+        }
         if (isDefault && authRepository.hasValidSession() && subscriptionRepository.evaluateLocalEntitlement()) {
             if (prefs.isOnboardingCompleted() && _currentScreen.value == LauncherScreen.ONBOARDING) {
                 _currentScreen.value = LauncherScreen.HOME

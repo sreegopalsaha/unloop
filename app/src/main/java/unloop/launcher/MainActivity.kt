@@ -1,5 +1,6 @@
 package unloop.launcher
 
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,6 +11,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -49,10 +51,21 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
 
         setContent {
             val themeMode by viewModel.themeMode.collectAsState()
+            val isSystemDark = isSystemInDarkTheme()
             val isDark = when (themeMode) {
                 "DARK" -> true
                 "LIGHT" -> false
-                else -> isSystemInDarkTheme()
+                else -> isSystemDark
+            }
+            val isDefaultLauncher by viewModel.isDefaultLauncher.collectAsState()
+            val themeWallpaperSyncEnabled by viewModel.themeWallpaperSyncEnabled.collectAsState()
+
+            LaunchedEffect(isDark, isDefaultLauncher, themeWallpaperSyncEnabled) {
+                if (themeWallpaperSyncEnabled && isDefaultLauncher) {
+                    viewModel.syncThemeWallpaper(isDark)
+                } else if (!themeWallpaperSyncEnabled || !isDefaultLauncher) {
+                    viewModel.restoreOriginalWallpaperIfNeeded()
+                }
             }
 
             UnloopTheme(darkTheme = isDark) {
@@ -60,6 +73,17 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
                     LauncherRoot(viewModel = viewModel, activity = this)
                 }
             }
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val themeMode = viewModel.themeMode.value
+        val isDefault = viewModel.isDefaultLauncher.value
+        val isSyncEnabled = viewModel.themeWallpaperSyncEnabled.value
+        if (themeMode == "SYSTEM" && isDefault && isSyncEnabled) {
+            val isDark = (newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+            viewModel.syncThemeWallpaper(isDark)
         }
     }
 
@@ -98,6 +122,7 @@ fun LauncherRoot(
     val focusModeEnabled by viewModel.focusModeEnabled.collectAsState()
     val focusApps by viewModel.focusApps.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
+    val themeWallpaperSyncEnabled by viewModel.themeWallpaperSyncEnabled.collectAsState()
     val notificationManagerEnabled by viewModel.notificationManagerEnabled.collectAsState()
     val filteredNotifications by viewModel.filteredNotifications.collectAsState()
     val isBatteryOptimizationIgnored by viewModel.isBatteryOptimizationIgnored.collectAsState()
@@ -176,6 +201,7 @@ fun LauncherRoot(
                     focusModeEnabled = focusModeEnabled,
                     notificationManagerEnabled = notificationManagerEnabled,
                     themeMode = themeMode,
+                    themeWallpaperSyncEnabled = themeWallpaperSyncEnabled,
                     onSetDefaultLauncher = { viewModel.openSetDefaultLauncher(activity) },
                     onToggleShortVideoBlocker = { enabled, onShowRationale ->
                         viewModel.requestToggleShortVideoBlocker(enabled, onShowRationale)
@@ -184,6 +210,7 @@ fun LauncherRoot(
                     onToggleNotificationManager = { enabled, onShowRationale ->
                         viewModel.requestToggleNotificationManager(enabled, onShowRationale)
                     },
+                    onToggleThemeWallpaperSync = { viewModel.setThemeWallpaperSyncEnabled(it) },
                     onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings(activity) },
                     onOpenNotificationSettings = { viewModel.openNotificationListenerSettings(activity) },
                     onCancelPendingPermission = { viewModel.cancelPendingPermissions() },

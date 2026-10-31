@@ -50,10 +50,12 @@ fun SettingsScreen(
     focusModeEnabled: Boolean,
     notificationManagerEnabled: Boolean,
     themeMode: String,
+    themeWallpaperSyncEnabled: Boolean = true,
     onSetDefaultLauncher: () -> Unit,
     onToggleShortVideoBlocker: (Boolean, () -> Unit) -> Unit,
     onToggleFocusMode: (Boolean) -> Unit,
     onToggleNotificationManager: (Boolean, () -> Unit) -> Unit,
+    onToggleThemeWallpaperSync: (Boolean) -> Unit = {},
     onOpenAccessibilitySettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onCancelPendingPermission: () -> Unit,
@@ -247,6 +249,40 @@ fun SettingsScreen(
                     onChangeTheme(nextMode)
                 }
             )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+            // Match wallpaper to theme
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Match wallpaper to theme",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Set home wallpaper to black or white based on theme",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.padding(horizontal = 8.dp))
+                Switch(
+                    checked = themeWallpaperSyncEnabled,
+                    onCheckedChange = onToggleThemeWallpaperSync,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.background,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+            }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
