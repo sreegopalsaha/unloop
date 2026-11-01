@@ -77,6 +77,8 @@ fun OnboardingScreen(
     authState: AuthState = AuthState.Idle,
     isEntitled: Boolean = false,
     plans: List<SubscriptionPlan> = emptyList(),
+    isPlansLoading: Boolean = false,
+    plansError: String? = null,
     isSubscriptionProcessing: Boolean = false,
     subscriptionErrorMessage: String? = null,
     hasPendingPaymentVerification: Boolean = false,
@@ -87,6 +89,7 @@ fun OnboardingScreen(
     onClearSubscriptionError: () -> Unit = {},
     onRetrySubscriptionSync: () -> Unit = {},
     onRetryPaymentVerification: () -> Unit = onRetrySubscriptionSync,
+    onRetryLoadPlans: () -> Unit = onRetrySubscriptionSync,
     onOpenHomeSettings: () -> Unit = {},
     onSetDefaultLauncher: () -> Unit,
     onCompleteOnboarding: () -> Unit,
@@ -171,6 +174,8 @@ fun OnboardingScreen(
                                     plans = plans,
                                     isProcessing = isSubscriptionProcessing,
                                     errorMessage = subscriptionErrorMessage,
+                                    isPlansLoading = isPlansLoading,
+                                    plansError = plansError,
                                     hasPendingPaymentVerification = hasPendingPaymentVerification,
                                     isEntitled = isEntitled,
                                     onSubscribeMonthly = onSubscribeMonthly,
@@ -178,6 +183,7 @@ fun OnboardingScreen(
                                     onClearError = onClearSubscriptionError,
                                     onRetrySync = onRetrySubscriptionSync,
                                     onRetryPaymentVerification = onRetryPaymentVerification,
+                                    onRetryLoadPlans = onRetryLoadPlans,
                                     onOpenHomeSettings = onOpenHomeSettings,
                                     onProceedToLauncherSetup = {
                                         coroutineScope.launch {

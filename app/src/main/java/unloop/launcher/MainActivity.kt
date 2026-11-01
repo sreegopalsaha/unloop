@@ -131,6 +131,8 @@ fun LauncherRoot(
     // Subscription & Entitlement State
     val isEntitled by viewModel.isEntitled.collectAsState()
     val subscriptionPlans by viewModel.subscriptionPlans.collectAsState()
+    val isPlansLoading by viewModel.isPlansLoading.collectAsState()
+    val subscriptionPlansError by viewModel.subscriptionPlansError.collectAsState()
     val isSubscriptionProcessing by viewModel.isSubscriptionProcessing.collectAsState()
     val subscriptionErrorMessage by viewModel.subscriptionErrorMessage.collectAsState()
     val hasPendingPaymentVerification by viewModel.hasPendingPaymentVerification.collectAsState()
@@ -146,6 +148,8 @@ fun LauncherRoot(
                     authState = authState,
                     isEntitled = isEntitled,
                     plans = subscriptionPlans,
+                    isPlansLoading = isPlansLoading,
+                    plansError = subscriptionPlansError,
                     isSubscriptionProcessing = isSubscriptionProcessing,
                     subscriptionErrorMessage = subscriptionErrorMessage,
                     hasPendingPaymentVerification = hasPendingPaymentVerification,
@@ -156,6 +160,7 @@ fun LauncherRoot(
                     onClearSubscriptionError = { viewModel.clearSubscriptionError() },
                     onRetrySubscriptionSync = { viewModel.retrySubscriptionSync() },
                     onRetryPaymentVerification = { viewModel.retryPaymentVerification() },
+                    onRetryLoadPlans = { viewModel.refreshSubscriptionPlans() },
                     onOpenHomeSettings = { viewModel.openAndroidHomeSettings(activity) },
                     onSetDefaultLauncher = { viewModel.openSetDefaultLauncher(activity) },
                     onCompleteOnboarding = { viewModel.completeOnboarding() },
@@ -267,6 +272,7 @@ fun LauncherRoot(
                 AccountScreen(
                     authState = authState,
                     entitlementState = entitlementState,
+                    plans = subscriptionPlans,
                     onLoginClick = { viewModel.loginWithGoogle(activity) },
                     onLogoutClick = { viewModel.logout() },
                     onCancelMonthlySubscription = { viewModel.cancelMonthlySubscription() },

@@ -48,12 +48,28 @@ class SubscriptionCryptoAndPricingTest {
                   {
                     "id": "plan_monthly",
                     "name": "Monthly Pro",
-                    "amount": 9900,
+                    "tagline": "Dynamic Monthly Tagline",
+                    "description": "Dynamic Description",
+                    "amount": 14900,
                     "currency": "INR",
                     "billingType": "recurring",
-                    "displayPrice": "₹99",
+                    "displayPrice": "₹149",
                     "displayPeriod": "/month",
+                    "badge": "Popular",
                     "features": ["Feature A", "Feature B"]
+                  },
+                  {
+                    "id": "plan_lifetime",
+                    "name": "Lifetime Ultimate",
+                    "tagline": "Pay once forever",
+                    "description": "Lifetime access description",
+                    "amount": 89900,
+                    "currency": "INR",
+                    "billingType": "one_time",
+                    "displayPrice": "₹899",
+                    "displayPeriod": "one-time",
+                    "badge": "Best Value",
+                    "features": ["All Features"]
                   }
                 ]
               }
@@ -61,10 +77,23 @@ class SubscriptionCryptoAndPricingTest {
         """.trimIndent()
 
         val parsed = PricingHelper.parsePlansJson(serverJson)
-        assertEquals(1, parsed.size)
-        assertEquals("Monthly Pro", parsed[0].name)
-        assertEquals(9900L, parsed[0].amountPaise)
-        assertEquals(listOf("Feature A", "Feature B"), parsed[0].features)
+        assertEquals(2, parsed.size)
+
+        val monthly = parsed[0]
+        assertEquals("Monthly Pro", monthly.name)
+        assertEquals(14900L, monthly.amountPaise)
+        assertEquals("₹149", monthly.displayPrice)
+        assertEquals("Dynamic Monthly Tagline", monthly.tagline)
+        assertEquals("Popular", monthly.badge)
+        assertEquals(listOf("Feature A", "Feature B"), monthly.features)
+
+        val lifetime = parsed[1]
+        assertEquals("Lifetime Ultimate", lifetime.name)
+        assertEquals(89900L, lifetime.amountPaise)
+        assertEquals("₹899", lifetime.displayPrice)
+        assertEquals("Pay once forever", lifetime.tagline)
+        assertEquals("Best Value", lifetime.badge)
+        assertEquals(listOf("All Features"), lifetime.features)
     }
 
     @Test
@@ -151,5 +180,11 @@ class SubscriptionCryptoAndPricingTest {
         // Simulated future time after expiresAt (2524608000000L)
         val futureTimeAfterExpiration = 2600000000000L
         assertFalse(verified!!.isCurrentlyValid(futureTimeAfterExpiration))
+    }
+
+    @Test
+    fun testOfflineEmptyPlansBehavior() {
+        val emptyList = PricingHelper.parsePlansJson("")
+        assertEquals(2, emptyList.size)
     }
 }

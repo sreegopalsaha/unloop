@@ -1,6 +1,8 @@
 package unloop.launcher.subscription
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +32,7 @@ class SubscriptionRepository(
     private val entitlementStorage: EntitlementStorage = EntitlementStorage.getInstance(context),
     private val apiClient: SubscriptionApiClient = SubscriptionApiClient()
 ) {
+    private val context: Context = context.applicationContext
     private val repoScope = CoroutineScope(Dispatchers.IO)
 
     private val _entitlementState = MutableStateFlow<EntitlementState>(EntitlementState.Loading)
@@ -42,17 +45,27 @@ class SubscriptionRepository(
         }
     }.stateIn(repoScope, SharingStarted.Eagerly, false)
 
-    private val _cachedPlans = MutableStateFlow<List<SubscriptionPlan>>(PricingHelper.getDefaultPlans())
+    private val _isPlansLoading = MutableStateFlow(true)
+    val isPlansLoading: StateFlow<Boolean> = _isPlansLoading.asStateFlow()
+
+    private val _plansError = MutableStateFlow<String?>(null)
+    val plansError: StateFlow<String?> = _plansError.asStateFlow()
+
+    private val _cachedPlans = MutableStateFlow<List<SubscriptionPlan>>(emptyList())
     val cachedPlans: StateFlow<List<SubscriptionPlan>> = _cachedPlans.asStateFlow()
 
     init {
         // Load plans from local cache or fallback
         val cachedJson = entitlementStorage.getCachedPlans()
-        if (cachedJson != null) {
+        if (!cachedJson.isNullOrBlank()) {
             _cachedPlans.value = PricingHelper.parsePlansJson(cachedJson)
         }
         // Initialize entitlement check from local Keystore-backed cache
         evaluateLocalEntitlement()
+        // Proactively refresh plans from backend
+        repoScope.launch {
+            refreshPlans()
+        }
     }
 
     /**
@@ -104,19 +117,55 @@ class SubscriptionRepository(
         }
     }
 
+    private fun isNetworkAvailable(): Boolean {
+        return try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return false
+            val activeNetwork = cm.activeNetwork ?: return false
+            val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return false
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     suspend fun refreshPlans(): List<SubscriptionPlan> = withContext(Dispatchers.IO) {
-        val result = apiClient.getPlans()
-        result.fold(
-            onSuccess = { plans ->
-                if (plans.isNotEmpty()) {
-                    _cachedPlans.value = plans
-                }
-                plans
-            },
-            onFailure = {
-                _cachedPlans.value
+        _isPlansLoading.value = true
+        try {
+            if (!isNetworkAvailable()) {
+                _plansError.value = "No internet connection. Please check your network and try again."
+                return@withContext _cachedPlans.value
             }
-        )
+
+            val rawResult = apiClient.getPlansWithRaw()
+            rawResult.fold(
+                onSuccess = { (plans, rawJson) ->
+                    if (plans.isNotEmpty()) {
+                        _cachedPlans.value = plans
+                        _plansError.value = null
+                        entitlementStorage.saveCachedPlans(rawJson)
+                    }
+                    plans
+                },
+                onFailure = { error ->
+                    val isOffline = error is java.net.UnknownHostException ||
+                            error is java.net.ConnectException ||
+                            error is java.net.SocketTimeoutException ||
+                            error is java.io.IOException ||
+                            !isNetworkAvailable()
+
+                    _plansError.value = if (isOffline) {
+                        "No internet connection. Please check your network and try again."
+                    } else {
+                        error.message ?: "Failed to load subscription plans"
+                    }
+
+                    _cachedPlans.value
+                }
+            )
+        } finally {
+            _isPlansLoading.value = false
+        }
     }
 
     suspend fun synchronizeEntitlement(forceServerCheck: Boolean = false): Result<EntitlementInfo> = withContext(Dispatchers.IO) {

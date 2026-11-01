@@ -49,6 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import unloop.launcher.auth.model.AuthState
 import unloop.launcher.subscription.model.EntitlementState
+import unloop.launcher.subscription.model.PricingHelper
+import unloop.launcher.subscription.model.SubscriptionPlan
 import unloop.launcher.ui.components.HeaderActionType
 import unloop.launcher.ui.components.ScreenHeader
 import java.text.SimpleDateFormat
@@ -59,6 +61,7 @@ import java.util.Locale
 fun AccountScreen(
     authState: AuthState,
     entitlementState: EntitlementState = EntitlementState.Loading,
+    plans: List<SubscriptionPlan> = emptyList(),
     onLoginClick: () -> Unit,
     onLogoutClick: () -> Unit,
     onCancelMonthlySubscription: () -> Unit = {},
@@ -271,8 +274,11 @@ fun AccountScreen(
                                                 color = MaterialTheme.colorScheme.secondary
                                             )
                                         } else {
+                                            val monthlyPlan = plans.find { it.id == PricingHelper.PLAN_MONTHLY } ?: PricingHelper.DEFAULT_MONTHLY_PLAN
+                                            val periodNotice = if (monthlyPlan.displayPeriod.startsWith("/")) monthlyPlan.displayPeriod else "/${monthlyPlan.displayPeriod}"
+                                            val renewalPrice = "${monthlyPlan.displayPrice}$periodNotice"
                                             Text(
-                                                text = "Renews automatically via UPI AutoPay on $dateStr (₹99/month).",
+                                                text = "Renews automatically via UPI AutoPay on $dateStr ($renewalPrice).",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.secondary
                                             )

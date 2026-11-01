@@ -41,6 +41,14 @@ data class SubscriptionPlan(
                 PlanBillingType.ONE_TIME
             }
 
+            val parsedDisplayPrice = if (obj.has("displayPrice") && obj.getString("displayPrice").isNotBlank()) {
+                obj.getString("displayPrice")
+            } else if (obj.optLong("amount", 0L) > 0) {
+                "₹${obj.optLong("amount", 0L) / 100}"
+            } else {
+                "₹99"
+            }
+
             return SubscriptionPlan(
                 id = obj.getString("id"),
                 name = obj.optString("name", "Premium Plan"),
@@ -50,8 +58,8 @@ data class SubscriptionPlan(
                 currency = obj.optString("currency", "INR"),
                 billingType = bType,
                 interval = if (obj.has("interval")) obj.getString("interval") else null,
-                displayPrice = obj.optString("displayPrice", "₹99"),
-                displayPeriod = obj.optString("displayPeriod", "/month"),
+                displayPrice = parsedDisplayPrice,
+                displayPeriod = obj.optString("displayPeriod", if (bType == PlanBillingType.RECURRING) "/month" else "one-time"),
                 badge = if (obj.has("badge")) obj.getString("badge") else null,
                 features = featureList
             )

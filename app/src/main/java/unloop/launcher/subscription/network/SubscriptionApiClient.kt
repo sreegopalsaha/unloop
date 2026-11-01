@@ -20,7 +20,7 @@ open class SubscriptionApiClient(
     private val baseUrl: String = BuildConfig.BACKEND_BASE_URL
 ) {
 
-    open suspend fun getPlans(): Result<List<SubscriptionPlan>> = withContext(Dispatchers.IO) {
+    open suspend fun getPlansWithRaw(): Result<Pair<List<SubscriptionPlan>, String>> = withContext(Dispatchers.IO) {
         try {
             val endpoint = URL("$baseUrl/api/plans")
             val connection = (endpoint.openConnection() as HttpURLConnection).apply {
@@ -37,13 +37,17 @@ open class SubscriptionApiClient(
 
             if (statusCode in 200..299) {
                 val plans = PricingHelper.parsePlansJson(responseString)
-                Result.success(plans)
+                Result.success(Pair(plans, responseString))
             } else {
                 Result.failure(AuthApiException("Failed to fetch plans: HTTP $statusCode", statusCode))
             }
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    open suspend fun getPlans(): Result<List<SubscriptionPlan>> = withContext(Dispatchers.IO) {
+        getPlansWithRaw().map { it.first }
     }
 
     open suspend fun createMonthlySubscription(

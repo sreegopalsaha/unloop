@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,6 +55,8 @@ fun OnboardingSubscriptionScreen(
     plans: List<SubscriptionPlan>,
     isProcessing: Boolean,
     errorMessage: String?,
+    isPlansLoading: Boolean = false,
+    plansError: String? = null,
     hasPendingPaymentVerification: Boolean = false,
     isEntitled: Boolean = false,
     onSubscribeMonthly: () -> Unit,
@@ -61,11 +64,114 @@ fun OnboardingSubscriptionScreen(
     onClearError: () -> Unit,
     onRetrySync: () -> Unit,
     onRetryPaymentVerification: () -> Unit = onRetrySync,
+    onRetryLoadPlans: () -> Unit = {},
     onOpenHomeSettings: () -> Unit = {},
     onCompleteOnboarding: () -> Unit = {},
     onProceedToLauncherSetup: () -> Unit = onCompleteOnboarding,
     modifier: Modifier = Modifier
 ) {
+    if (plans.isEmpty()) {
+        if (isPlansLoading) {
+            Box(
+                modifier = modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(32.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(36.dp),
+                        strokeWidth = 3.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Loading subscription options...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+            return
+        }
+
+        // Dedicated No Internet Connection Empty State
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = CircleShape,
+                    modifier = Modifier.size(72.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.WifiOff,
+                            contentDescription = "No internet connection",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = "No internet connection",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = plansError ?: "Please check your network settings and try again to view subscription plans.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp
+                )
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                Button(
+                    onClick = onRetryLoadPlans,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(46.dp)
+                ) {
+                    Text(
+                        text = "Try Again",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                }
+            }
+        }
+        return
+    }
+
     var selectedPlanId by remember { mutableStateOf(PricingHelper.PLAN_MONTHLY) }
 
     val monthlyPlan = plans.find { it.id == PricingHelper.PLAN_MONTHLY } ?: PricingHelper.DEFAULT_MONTHLY_PLAN
@@ -123,6 +229,42 @@ fun OnboardingSubscriptionScreen(
             modifier = Modifier.padding(horizontal = 16.dp)
         )
 
+        if (plansError != null) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.WifiOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Offline — showing saved plan details",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onRetryLoadPlans) {
+                        Text(
+                            text = "Retry",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
 
         // Plan 1: Monthly UPI AutoPay Card
@@ -130,12 +272,12 @@ fun OnboardingSubscriptionScreen(
             title = monthlyPlan.name,
             price = monthlyPlan.displayPrice,
             period = monthlyPlan.displayPeriod,
-            tagline = "UPI AutoPay Recurring Mandate",
-            description = "Subsequent monthly renewals are billed automatically. Cancel anytime.",
-            badge = "Flexible",
+            tagline = monthlyPlan.tagline.ifBlank { "UPI AutoPay Recurring Mandate" },
+            description = monthlyPlan.description.ifBlank { "Subsequent monthly renewals are billed automatically. Cancel anytime." },
+            badge = monthlyPlan.badge ?: "Flexible",
             isSelected = selectedPlanId == PricingHelper.PLAN_MONTHLY,
             onClick = {
-                if (!isProcessing) {
+                if (!isProcessing && !isPlansLoading) {
                     selectedPlanId = PricingHelper.PLAN_MONTHLY
                     onClearError()
                 }
@@ -149,12 +291,12 @@ fun OnboardingSubscriptionScreen(
             title = lifetimePlan.name,
             price = lifetimePlan.displayPrice,
             period = lifetimePlan.displayPeriod,
-            tagline = "Single One-Time Payment",
-            description = "No recurring charges or mandates. Permanent entitlement for this account.",
-            badge = "Best Value",
+            tagline = lifetimePlan.tagline.ifBlank { "Single One-Time Payment" },
+            description = lifetimePlan.description.ifBlank { "No recurring charges or mandates. Permanent entitlement for this account." },
+            badge = lifetimePlan.badge ?: "Best Value",
             isSelected = selectedPlanId == PricingHelper.PLAN_LIFETIME,
             onClick = {
-                if (!isProcessing) {
+                if (!isProcessing && !isPlansLoading) {
                     selectedPlanId = PricingHelper.PLAN_LIFETIME
                     onClearError()
                 }
@@ -163,6 +305,18 @@ fun OnboardingSubscriptionScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        val selectedPlan = if (selectedPlanId == PricingHelper.PLAN_MONTHLY) monthlyPlan else lifetimePlan
+        val activeFeatures = if (selectedPlan.features.isNotEmpty()) {
+            selectedPlan.features
+        } else {
+            listOf(
+                "Minimalist distraction-free home screen",
+                "Short-video reels & shorts blocker",
+                "Mindful focus pause on opening tempting apps",
+                "Quiet notification batching & manager"
+            )
+        }
+
         // Feature Highlights
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
@@ -170,13 +324,10 @@ fun OnboardingSubscriptionScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                FeatureRow(text = "Minimalist distraction-free home screen")
-                Spacer(modifier = Modifier.height(8.dp))
-                FeatureRow(text = "Short-video reels & shorts blocker")
-                Spacer(modifier = Modifier.height(8.dp))
-                FeatureRow(text = "Mindful focus pause on opening tempting apps")
-                Spacer(modifier = Modifier.height(8.dp))
-                FeatureRow(text = "Quiet notification batching & manager")
+                activeFeatures.forEachIndexed { index, feature ->
+                    if (index > 0) Spacer(modifier = Modifier.height(8.dp))
+                    FeatureRow(text = feature)
+                }
             }
         }
 
@@ -205,8 +356,9 @@ fun OnboardingSubscriptionScreen(
                             .padding(top = 2.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
+                    val periodNotice = if (monthlyPlan.displayPeriod.startsWith("/")) monthlyPlan.displayPeriod else "/${monthlyPlan.displayPeriod}"
                     Text(
-                        text = "Monthly plan authorizes an automated UPI AutoPay recurring mandate of ₹99/month. You can cancel anytime from Settings or directly in your UPI app.",
+                        text = "Monthly plan authorizes an automated UPI AutoPay recurring mandate of ${monthlyPlan.displayPrice}$periodNotice. You can cancel anytime from Settings or directly in your UPI app.",
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 12.sp,
                             lineHeight = 16.sp
@@ -336,7 +488,7 @@ fun OnboardingSubscriptionScreen(
                         onPurchaseLifetime()
                     }
                 },
-                enabled = !isProcessing,
+                enabled = !isProcessing && !(isPlansLoading && plans.isEmpty()),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
@@ -363,10 +515,17 @@ fun OnboardingSubscriptionScreen(
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                     )
                 } else {
-                    val buttonText = if (selectedPlanId == PricingHelper.PLAN_MONTHLY) {
-                        "Authorize Monthly AutoPay • ₹99/mo"
+                    val monthlyPeriodSuffix = if (monthlyPlan.displayPeriod.startsWith("/")) {
+                        monthlyPlan.displayPeriod
+                    } else if (monthlyPlan.displayPeriod.isNotBlank()) {
+                        "/${monthlyPlan.displayPeriod}"
                     } else {
-                        "Get Lifetime Premium • ₹699"
+                        "/month"
+                    }
+                    val buttonText = if (selectedPlanId == PricingHelper.PLAN_MONTHLY) {
+                        "Authorize Monthly AutoPay • ${monthlyPlan.displayPrice}$monthlyPeriodSuffix"
+                    } else {
+                        "Get Lifetime Premium • ${lifetimePlan.displayPrice}"
                     }
                     Text(
                         text = buttonText,

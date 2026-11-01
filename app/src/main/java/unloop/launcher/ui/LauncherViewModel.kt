@@ -82,6 +82,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val isEntitled: StateFlow<Boolean> = subscriptionRepository.isEntitled
     val entitlementState: StateFlow<EntitlementState> = subscriptionRepository.entitlementState
     val subscriptionPlans: StateFlow<List<SubscriptionPlan>> = subscriptionRepository.cachedPlans
+    val isPlansLoading: StateFlow<Boolean> = subscriptionRepository.isPlansLoading
+    val subscriptionPlansError: StateFlow<String?> = subscriptionRepository.plansError
 
     private val _isSubscriptionProcessing = MutableStateFlow(false)
     val isSubscriptionProcessing: StateFlow<Boolean> = _isSubscriptionProcessing.asStateFlow()
@@ -715,6 +717,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     // --- Subscription & Payment Actions ---
+
+    fun refreshSubscriptionPlans() {
+        viewModelScope.launch {
+            subscriptionRepository.refreshPlans()
+        }
+    }
 
     fun subscribeMonthly(activity: Activity) {
         if (_isSubscriptionProcessing.value) return
