@@ -34,9 +34,6 @@ class PreferencesManager internal constructor(private val prefs: SharedPreferenc
     private val _themeModeFlow = MutableStateFlow(getThemeMode())
     val themeModeFlow: StateFlow<String> = _themeModeFlow.asStateFlow()
 
-    private val _themeWallpaperSyncFlow = MutableStateFlow(isThemeWallpaperSyncEnabled())
-    val themeWallpaperSyncFlow: StateFlow<Boolean> = _themeWallpaperSyncFlow.asStateFlow()
-
     private val _showSystemAppsCleanupFlow = MutableStateFlow(isShowSystemAppsCleanup())
     val showSystemAppsCleanupFlow: StateFlow<Boolean> = _showSystemAppsCleanupFlow.asStateFlow()
 
@@ -311,15 +308,6 @@ class PreferencesManager internal constructor(private val prefs: SharedPreferenc
         _themeModeFlow.value = mode
     }
 
-    fun isThemeWallpaperSyncEnabled(): Boolean {
-        return prefs.getBoolean(KEY_THEME_WALLPAPER_SYNC, true)
-    }
-
-    fun setThemeWallpaperSyncEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_THEME_WALLPAPER_SYNC, enabled).apply()
-        _themeWallpaperSyncFlow.value = enabled
-    }
-
     fun hasSavedOriginalWallpaper(): Boolean {
         return prefs.getBoolean(KEY_HAS_SAVED_ORIGINAL_WALLPAPER, false)
     }
@@ -409,7 +397,6 @@ class PreferencesManager internal constructor(private val prefs: SharedPreferenc
         private const val KEY_NOTIFICATION_APPS = "pref_notification_apps"
         private const val KEY_NOTIFICATIONS_JSON = "pref_notifications_json"
         private const val KEY_THEME_MODE = "pref_theme_mode"
-        private const val KEY_THEME_WALLPAPER_SYNC = "pref_theme_wallpaper_sync"
         private const val KEY_HAS_SAVED_ORIGINAL_WALLPAPER = "pref_has_saved_original_wallpaper"
         private const val KEY_WAS_THEME_WALLPAPER_APPLIED = "pref_was_theme_wallpaper_applied"
         private const val KEY_LAST_APPLIED_WALLPAPER_COLOR = "pref_last_applied_wallpaper_color"

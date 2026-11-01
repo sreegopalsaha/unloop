@@ -58,12 +58,10 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
                 else -> isSystemDark
             }
             val isDefaultLauncher by viewModel.isDefaultLauncher.collectAsState()
-            val themeWallpaperSyncEnabled by viewModel.themeWallpaperSyncEnabled.collectAsState()
-
-            LaunchedEffect(isDark, isDefaultLauncher, themeWallpaperSyncEnabled) {
-                if (themeWallpaperSyncEnabled && isDefaultLauncher) {
+            LaunchedEffect(isDark, isDefaultLauncher) {
+                if (isDefaultLauncher) {
                     viewModel.syncThemeWallpaper(isDark)
-                } else if (!themeWallpaperSyncEnabled || !isDefaultLauncher) {
+                } else {
                     viewModel.restoreOriginalWallpaperIfNeeded()
                 }
             }
@@ -80,8 +78,7 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         super.onConfigurationChanged(newConfig)
         val themeMode = viewModel.themeMode.value
         val isDefault = viewModel.isDefaultLauncher.value
-        val isSyncEnabled = viewModel.themeWallpaperSyncEnabled.value
-        if (themeMode == "SYSTEM" && isDefault && isSyncEnabled) {
+        if (themeMode == "SYSTEM" && isDefault) {
             val isDark = (newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
             viewModel.syncThemeWallpaper(isDark)
         }
@@ -122,7 +119,6 @@ fun LauncherRoot(
     val focusModeEnabled by viewModel.focusModeEnabled.collectAsState()
     val focusApps by viewModel.focusApps.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
-    val themeWallpaperSyncEnabled by viewModel.themeWallpaperSyncEnabled.collectAsState()
     val notificationManagerEnabled by viewModel.notificationManagerEnabled.collectAsState()
     val filteredNotifications by viewModel.filteredNotifications.collectAsState()
     val isBatteryOptimizationIgnored by viewModel.isBatteryOptimizationIgnored.collectAsState()
@@ -201,7 +197,6 @@ fun LauncherRoot(
                     focusModeEnabled = focusModeEnabled,
                     notificationManagerEnabled = notificationManagerEnabled,
                     themeMode = themeMode,
-                    themeWallpaperSyncEnabled = themeWallpaperSyncEnabled,
                     onSetDefaultLauncher = { viewModel.openSetDefaultLauncher(activity) },
                     onToggleShortVideoBlocker = { enabled, onShowRationale ->
                         viewModel.requestToggleShortVideoBlocker(enabled, onShowRationale)
@@ -210,7 +205,6 @@ fun LauncherRoot(
                     onToggleNotificationManager = { enabled, onShowRationale ->
                         viewModel.requestToggleNotificationManager(enabled, onShowRationale)
                     },
-                    onToggleThemeWallpaperSync = { viewModel.setThemeWallpaperSyncEnabled(it) },
                     onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings(activity) },
                     onOpenNotificationSettings = { viewModel.openNotificationListenerSettings(activity) },
                     onCancelPendingPermission = { viewModel.cancelPendingPermissions() },

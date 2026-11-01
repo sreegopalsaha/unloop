@@ -193,13 +193,6 @@ class WallpaperThemeManager(
         isDefaultLauncher: Boolean
     ): Boolean = withContext(ioDispatcher) {
         mutex.withLock {
-            if (!prefs.isThemeWallpaperSyncEnabled()) {
-                if (prefs.wasThemeWallpaperApplied()) {
-                    restoreOriginalWallpaperInternal()
-                }
-                return@withLock false
-            }
-
             if (!isDefaultLauncher) {
                 if (prefs.wasThemeWallpaperApplied()) {
                     restoreOriginalWallpaperInternal()

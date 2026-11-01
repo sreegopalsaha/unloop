@@ -177,7 +177,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val focusModeEnabled: StateFlow<Boolean> = prefs.focusModeFlow
     val focusApps: StateFlow<Set<String>> = prefs.focusAppsFlow
     val themeMode: StateFlow<String> = prefs.themeModeFlow
-    val themeWallpaperSyncEnabled: StateFlow<Boolean> = prefs.themeWallpaperSyncFlow
     val showSystemAppsCleanup: StateFlow<Boolean> = prefs.showSystemAppsCleanupFlow
 
     fun setShowSystemAppsCleanup(show: Boolean) {
@@ -510,14 +509,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         prefs.setThemeMode(mode)
     }
 
-    fun setThemeWallpaperSyncEnabled(enabled: Boolean) {
-        prefs.setThemeWallpaperSyncEnabled(enabled)
-        if (!enabled) {
-            viewModelScope.launch {
-                wallpaperThemeManager.restoreOriginalWallpaper()
-            }
-        }
-    }
 
     fun syncThemeWallpaper(isDark: Boolean) {
         viewModelScope.launch {

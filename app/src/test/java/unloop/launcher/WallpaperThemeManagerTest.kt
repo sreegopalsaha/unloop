@@ -131,7 +131,6 @@ class WallpaperThemeManagerTest {
     @Test
     fun testLightMode_appliesSolidWhiteToSystemOnly() = runBlocking {
         prefsManager.setThemeMode("LIGHT")
-        prefsManager.setThemeWallpaperSyncEnabled(true)
 
         val applied = wallpaperThemeManager.applyThemeWallpaper(
             isDark = false,
@@ -156,7 +155,6 @@ class WallpaperThemeManagerTest {
     @Test
     fun testDarkMode_appliesSolidBlackToSystemOnly() = runBlocking {
         prefsManager.setThemeMode("DARK")
-        prefsManager.setThemeWallpaperSyncEnabled(true)
 
         val applied = wallpaperThemeManager.applyThemeWallpaper(
             isDark = true,
@@ -239,7 +237,6 @@ class WallpaperThemeManagerTest {
     @Test
     fun testSwitchAwayFromDefaultLauncher_triggersRestore() = runBlocking {
         // Set up theme wallpaper applied while default
-        prefsManager.setThemeWallpaperSyncEnabled(true)
         prefsManager.setWasThemeWallpaperApplied(true)
         prefsManager.setHasSavedOriginalWallpaper(true)
         val backupFile = prefsManager.getSavedOriginalWallpaperFile(fakeContext)
@@ -259,26 +256,17 @@ class WallpaperThemeManagerTest {
     }
 
     @Test
-    fun testDisableFeature_triggersRestore() = runBlocking {
-        // Set up theme wallpaper applied
-        prefsManager.setWasThemeWallpaperApplied(true)
-        prefsManager.setHasSavedOriginalWallpaper(true)
-        val backupFile = prefsManager.getSavedOriginalWallpaperFile(fakeContext)
-        backupFile.writeText("ORIGINAL_WALLPAPER_DATA")
-
-        // Disable feature
-        prefsManager.setThemeWallpaperSyncEnabled(false)
-
-        val result = wallpaperThemeManager.applyThemeWallpaper(
+    fun testAlwaysMatchesTheme_appliesThemeWallpaperDirectly() = runBlocking {
+        val applied = wallpaperThemeManager.applyThemeWallpaper(
             isDark = true,
             isDefaultLauncher = true
         )
 
-        assertFalse(result)
-        // Original wallpaper restored
+        assertTrue(applied)
         assertEquals(1, fakeAdapter.setBitmapCalls.size)
         assertEquals(WallpaperManager.FLAG_SYSTEM, fakeAdapter.setBitmapCalls[0].second)
-        assertFalse(prefsManager.wasThemeWallpaperApplied())
+        assertTrue(prefsManager.wasThemeWallpaperApplied())
+        assertEquals(Color.BLACK, prefsManager.getLastAppliedWallpaperColor())
     }
 
     @Test
@@ -303,7 +291,6 @@ class WallpaperThemeManagerTest {
 
     @Test
     fun testIdempotency_sameThemeColorNotReapplied() = runBlocking {
-        prefsManager.setThemeWallpaperSyncEnabled(true)
 
         // First apply
         wallpaperThemeManager.applyThemeWallpaper(isDark = true, isDefaultLauncher = true)
@@ -322,7 +309,6 @@ class WallpaperThemeManagerTest {
 
     @Test
     fun testNeverChangesLockScreenWallpaperAcrossOperations() = runBlocking {
-        prefsManager.setThemeWallpaperSyncEnabled(true)
 
         // Apply dark
         wallpaperThemeManager.applyThemeWallpaper(isDark = true, isDefaultLauncher = true)
